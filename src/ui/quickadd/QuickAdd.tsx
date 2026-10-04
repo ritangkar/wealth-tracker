@@ -9,11 +9,12 @@ import InvestForm from './InvestForm';
 import LoanForm from './LoanForm';
 import WasteForm from './WasteForm';
 import GoalForm from './GoalForm';
+import MoreForm from './MoreForm';
 import { Note } from './shared';
 
 const TABS: { kind: QuickKind; label: string }[] = [
   { kind: 'expense', label: 'Expense' }, { kind: 'income', label: 'Income' }, { kind: 'transfer', label: 'Transfer' },
-  { kind: 'invest', label: 'Invest' }, { kind: 'loan', label: 'Loan payment' }, { kind: 'waste', label: 'Waste' }, { kind: 'goal', label: 'Goal' },
+  { kind: 'invest', label: 'Invest' }, { kind: 'loan', label: 'Loan payment' }, { kind: 'waste', label: 'Waste' }, { kind: 'goal', label: 'Goal' }, { kind: 'more', label: 'More' },
 ];
 
 export default function QuickAdd() {
@@ -46,6 +47,7 @@ export default function QuickAdd() {
         : kind === 'invest' ? <InvestForm {...props} />
         : kind === 'loan' ? <LoanForm {...props} />
         : kind === 'waste' ? <WasteForm {...props} />
+        : kind === 'more' ? <MoreForm {...props} />
         : <GoalForm {...props} />}
     </Sheet>
   );

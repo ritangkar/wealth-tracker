@@ -60,8 +60,19 @@ function Shell({ store }: { store: Store }) {
   const toasts = useToasts();
   const [locked, setLocked] = useState<boolean | null>(null);
 
-  useEffect(() => { if (store.status !== 'ready') return; (async () => setLocked(db.settings.lockEnabled && (await hasPin(store.meta))))(); /* only at boot */ // eslint-disable-next-line
+  useEffect(() => {
+    (async () => {
+      const pin = await hasPin(store.meta);
+      // A PIN record is the source of truth: never boot unlocked just because a restore/erase reset the settings flag.
+      if (store.status === 'ready' && pin && !store.db.settings.lockEnabled) await store.updateSettings({ lockEnabled: true });
+      setLocked(pin);
+    })(); /* only at boot */ // eslint-disable-next-line
   }, []);
+  // keep the lock flag consistent with the PIN record after an erase or restore
+  useEffect(() => {
+    if (store.status !== 'ready' || db.settings.lockEnabled) return;
+    void hasPin(store.meta).then((pin) => { if (pin && !store.db.settings.lockEnabled) void store.updateSettings({ lockEnabled: true }); });
+  }, [db.settings.lockEnabled]);
   // re-lock after the app has been in the background for 2 minutes
   useEffect(() => {
     let hiddenAt = 0;
@@ -77,9 +88,10 @@ function Shell({ store }: { store: Store }) {
     const t = setTimeout(() => { void store.captureSnapshot(); }, 1500); return () => clearTimeout(t);
   }, [db.transactions, db.accounts, db.valuations, db.investments, db.assets, db.liabilities]);
 
-  if (store.status === 'recovery') return <Recovery store={store} />;
   if (locked === null) return null;
+  // With a PIN set, even the recovery screen (raw data download) sits behind the lock screen.
   if (locked) return <LockScreen onUnlock={() => setLocked(false)} />;
+  if (store.status === 'recovery') return <Recovery store={store} />;
 
   const def = ROUTES.find((r) => r.path === route.path);
   const Page = def?.component;

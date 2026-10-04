@@ -49,7 +49,7 @@ export function useToasts() {
 }
 
 // ---- quick-add sheet control
-export type QuickKind = 'expense' | 'income' | 'transfer' | 'invest' | 'loan' | 'waste' | 'goal';
+export type QuickKind = 'expense' | 'income' | 'transfer' | 'invest' | 'loan' | 'waste' | 'goal' | 'more';
 let quick: { kind: QuickKind; editId?: string } | null = null; const quickListeners = new Set<() => void>();
 export function openQuickAdd(kind: QuickKind = 'expense', editId?: string) { quick = { kind, editId }; quickListeners.forEach((l) => l()); }
 export function closeQuickAdd() { quick = null; quickListeners.forEach((l) => l()); }

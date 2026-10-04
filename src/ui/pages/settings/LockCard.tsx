@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'preact/hooks';
-import { Banner, Button, Card, Sheet, TextField } from '../../kit';
+import { Banner, Button, Card, PasswordField, Sheet } from '../../kit';
 import { toast, useDb, useStore } from '../../state';
 import { clearPin, hasPin, setPin, verifyPin } from '../../lock';
 
@@ -29,13 +29,13 @@ export function LockCard() {
       </div>
       <Banner tone="info">The lock hides the app from someone picking up your phone or laptop. It is <b>not encryption</b>: the data in this browser’s storage is not encrypted, and backup files are plain JSON. Don’t rely on it as banking-grade security. Never store card numbers, CVV, PINs or bank passwords in notes.</Banner>
       {open === 'set' && <Sheet title={has ? 'Change PIN' : 'Set a PIN'} onClose={close} footer={<><Button variant="ghost" onClick={close}>Cancel</Button><Button variant="primary" onClick={save}>Save</Button></>}>
-        {has && <TextField label="Current PIN" value={cur} onInput={setCur} />}
-        <TextField label="New PIN (4–8 digits)" value={a} onInput={(v) => setA(v.replace(/\D/g, ''))} maxLength={8} />
-        <TextField label="Repeat new PIN" value={b} onInput={(v) => setB(v.replace(/\D/g, ''))} maxLength={8} error={err} />
+        {has && <PasswordField label="Current PIN" value={cur} onInput={setCur} autoComplete="off" />}
+        <PasswordField label="New PIN (4–8 digits)" value={a} onInput={(v) => setA(v.replace(/\D/g, ''))} maxLength={8} autoComplete="new-password" />
+        <PasswordField label="Repeat new PIN" value={b} onInput={(v) => setB(v.replace(/\D/g, ''))} maxLength={8} error={err} autoComplete="new-password" />
         <p class="hint">If you forget the PIN you can still recover your data from a backup file, so keep one.</p>
       </Sheet>}
       {open === 'remove' && <Sheet title="Remove app lock" onClose={close} footer={<><Button variant="ghost" onClick={close}>Cancel</Button><Button variant="danger" onClick={remove}>Remove lock</Button></>}>
-        <TextField label="Current PIN" value={cur} onInput={setCur} error={err} />
+        <PasswordField label="Current PIN" value={cur} onInput={setCur} error={err} autoComplete="off" />
       </Sheet>}
     </Card>
   );

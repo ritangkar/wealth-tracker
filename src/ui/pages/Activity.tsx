@@ -23,6 +23,7 @@ const PAGE = 120;
 const KIND_FOR: Partial<Record<TxnType, QuickKind>> = {
   expense: 'expense', income: 'income', transfer: 'transfer', cc_settlement: 'transfer',
   investment_contribution: 'invest', investment_redemption: 'invest', liability_payment: 'loan',
+  refund: 'more', asset_acquisition: 'more', liability_creation: 'more',
 };
 
 interface Filters { q: string; month: MonthKey | null; group: TypeGroup; cat: string; owner: string; account: string; method: string; tag: string }

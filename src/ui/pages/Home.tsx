@@ -2,6 +2,7 @@ import { useState } from 'preact/hooks';
 import { monthlySeries, monthTxns, projectMonthEnd, scopedTxns, spendingByCategory, summarizeMonth, compareMonth } from '../../domain/cashflow';
 import { goalProgress, goalsInScope } from '../../domain/goals';
 import { generateInsights } from '../../domain/insights';
+import { cardMetrics } from '../../domain/cards';
 import { debtOverview } from '../../domain/liabilities';
 import { computeNetWorth, snapshotSeries } from '../../domain/networth';
 import { upcomingCommitments, type Commitment } from '../../domain/expected';
@@ -43,6 +44,8 @@ export default function Home() {
   const upcoming = upcomingCommitments(db, scope, today, addDays(today, 14), today);
   const goals = goalsInScope(db, scope).filter((g) => g.status === 'active').map((g) => goalProgress(db, g, today)).sort((a, b) => b.pct - a.pct).slice(0, 3);
   const debt = debtOverview({ transactions: db.transactions, liabilities: db.liabilities.filter((l) => inScope(l.ownerId, scope)) }, today);
+  // Same figure the Debt page uses (bank report + later activity, EMI-aware), not the raw ledger balance.
+  const cardOutstanding = db.accounts.filter((a) => a.kind === 'credit_card' && !a.archived && inScope(a.ownerId, scope)).reduce((sum, a) => sum + cardMetrics(db, a, today).outstanding, 0);
   const waste = wasteMonth(db, scope, month);
   const six = monthlySeries(txns, addMonthsKey(month, -5), month);
   const hasMonthData = sum.txnCount > 0;
@@ -120,7 +123,7 @@ export default function Home() {
             <>
               <div class="grid">
                 <Stat label="Loans outstanding" value={formatCompact(debt.totalDebt)} />
-                <Stat label="Card outstanding" value={formatCompact(nw.liabilities.cards)} />
+                <Stat label="Card outstanding" value={formatCompact(cardOutstanding)} />
                 <Stat label="Loan EMIs / month" value={formatCompact(debt.monthlyCommitment)} />
                 <Stat label="Debt-free (estimate)" value={debt.projectedDebtFree ? monthLabel(debt.projectedDebtFree.slice(0, 7)) : '—'} sub={debt.debtFreeUnknown ? 'Needs an EMI on each loan' : undefined} />
               </div>

@@ -4,6 +4,7 @@ import { ACCOUNT_KIND_LABELS, formatDate, formatMoney } from '../../format';
 import { defaultOwner, ownerOptions, toast, useDb, useScope, useStore } from '../../state';
 import { accountBalances } from '../../../domain/ledger';
 import { inScope } from '../../../domain/scope';
+import { EmiInLedgerCheck } from '../../quickadd/EmiInstalment';
 import type { Account, AccountKind, CardDetails, OwnerId } from '../../../domain/types';
 import { Note, OwnerBadge } from './shared';
 
@@ -77,6 +78,7 @@ function AccountForm({ id, onClose }: { id?: string; onClose: () => void }) {
   const [stmt, setStmt] = useState<number | undefined>(existing?.card?.statementDay);
   const [due, setDue] = useState<number | undefined>(existing?.card?.dueDay);
   const [last4, setLast4] = useState(existing?.card?.last4 ?? '');
+  const [emiInLedger, setEmiInLedger] = useState(existing?.card?.emiInLedger !== false);
   const [notes, setNotes] = useState(existing?.notes ?? '');
   const [issues, setIssues] = useState<{ field: string; message: string }[]>([]);
   const isCard = kind === 'credit_card';
@@ -92,6 +94,7 @@ function AccountForm({ id, onClose }: { id?: string; onClose: () => void }) {
       if (stmt !== undefined) card.statementDay = stmt; else delete card.statementDay;
       if (due !== undefined) card.dueDay = due; else delete card.dueDay;
       if (last4) card.last4 = last4; else delete card.last4;
+      card.emiInLedger = emiInLedger;
     }
     const draft = { name: name.trim(), kind, ownerId: owner, openingBalance: isCard ? -(opening ?? 0) : opening ?? 0, openingDate, notes: notes.trim() || undefined, archived: existing?.archived, card };
     const r = existing ? await store.updateAccount(existing.id, draft) : await store.addAccount(draft);
@@ -130,6 +133,7 @@ function AccountForm({ id, onClose }: { id?: string; onClose: () => void }) {
               <IntField label="Due day (optional)" value={due} onChange={setDue} min={1} max={31} error={fieldError(issues, 'dueDay')} />
             </div>
             <TextField label="Last 4 digits (optional)" value={last4} onInput={(v) => setLast4(v.replace(/\D/g, '').slice(0, 4))} maxLength={4} error={fieldError(issues, 'last4')} hint="Helps you tell cards apart." />
+            <EmiInLedgerCheck checked={emiInLedger} onChange={setEmiInLedger} />
             <p class="wl-privacy">Privacy: only the last 4 digits can be stored. Never enter the full card number, CVV, PIN or passwords — this app doesn’t need them.</p>
           </>
         )}

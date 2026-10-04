@@ -75,7 +75,7 @@ export default function HoldingsTab({ kind }: { kind: HoldingKind }) {
 
       {!isInv && (
         <Disclosure summary="How buying an asset is counted">
-          <p>When you buy gold, property or a vehicle, money moves from an account to the asset. It is <b>not an expense</b> — your net worth stays the same, because cash became an asset. Record the purchase as “Asset bought”; keep the asset’s value up to date here.</p>
+          <p>When you buy gold, property or a vehicle, money moves from an account to the asset. It is <b>not an expense</b> — your net worth stays the same, because cash became an asset. Record the purchase from Quick Add → More → “Buy an asset”; keep the asset’s value up to date here.</p>
         </Disclosure>
       )}
 

@@ -19,7 +19,7 @@ export function LockScreen({ onUnlock }: { onUnlock: () => void }) {
   return (
     <div class="fullscreen"><Card>
       <h1>Wealth OS is locked</h1><p class="muted">Enter your PIN (4–8 digits), then tap Unlock.</p>
-      <div class="pin-dots" aria-label={`${pin.length} digits entered`}>{Array.from({ length: Math.max(4, pin.length) }, (_, i) => <i key={i} class={i < pin.length ? 'on' : ''} />)}</div>
+      <div class="pin-dots" role="img" aria-label={`${pin.length} digits entered`}>{Array.from({ length: Math.max(4, pin.length) }, (_, i) => <i key={i} class={i < pin.length ? 'on' : ''} />)}</div>
       {msg && <Banner tone="warn">{msg}</Banner>}
       <div class="keypad">
         {['1', '2', '3', '4', '5', '6', '7', '8', '9'].map((d) => <button key={d} type="button" onClick={() => press(d)} aria-label={d}>{d}</button>)}

@@ -1,15 +1,31 @@
 import { useState } from 'preact/hooks';
-import { Badge, Button, Card, DateField, EmptyState, FormErrors, MoneyField, SelectField, Sheet, Stat, TextField, fieldError, useConfirm } from '../../kit';
+import { Badge, Button, Card, DateField, EmptyState, MoneyField, SelectField, Sheet, Stat, TextField, fieldError, useConfirm } from '../../kit';
 import { toast, useAction, useDb, useScope, useStore, personName } from '../../state';
 import { accountName, formatDate, formatMoney } from '../../format';
 import { addDays, diffDays, type ISODate } from '../../../domain/dates';
 import { draftFromOccurrence, expectedOccurrences, upcomingCommitments, type Occurrence } from '../../../domain/expected';
 import { inScope } from '../../../domain/scope';
-import type { ExpectedItem } from '../../../domain/types';
+import type { Database, ExpectedItem, Id, Transaction } from '../../../domain/types';
 import { ExpectedFormSheet, FREQ_LABEL, KIND_LABEL } from './ExpectedForm';
 import './plan.css';
 
 const ICON: Record<ExpectedItem['kind'], string> = { subscription: '↻', sip: '📈', salary: '💼', bill: '🧾', other: '•' };
+
+/** Most likely existing transaction (same month & owner) that already covers this occurrence, if any. */
+function findMatchingTxn(db: Database, item: ExpectedItem, date: ISODate): Transaction | undefined {
+  const month = date.slice(0, 7);
+  const taken = new Set(db.expectedItems.flatMap((e) => Object.values(e.confirmed)));
+  const name = (item.merchant ?? item.name).trim().toLowerCase();
+  const pool = db.transactions.filter((t) => {
+    if (t.date.slice(0, 7) !== month || t.ownerId !== item.ownerId || taken.has(t.id)) return false;
+    if (item.kind === 'salary') return t.type === 'income' && (t.incomeType ?? 'Salary') === (item.incomeType ?? 'Salary');
+    if (item.kind === 'sip') return t.type === 'investment_contribution' && t.investmentId === item.investmentId;
+    const m = (t.merchant ?? '').trim().toLowerCase();
+    return t.type === 'expense' && !!m && (m === name || m.includes(name) || name.includes(m));
+  });
+  const score = (t: Transaction) => Math.abs(t.amount - item.amount) / Math.max(1, item.amount) + Math.abs(diffDays(t.date, date)) / 365;
+  return pool.sort((a, b) => score(a) - score(b))[0];
+}
 const when = (d: ISODate, today: ISODate) => { const n = diffDays(d, today); return n === 0 ? 'Today' : n === 1 ? 'Tomorrow' : n === -1 ? 'Yesterday' : n < 0 ? `${-n} days ago` : `In ${n} days`; };
 
 export default function Upcoming() {
@@ -27,18 +43,28 @@ export default function Upcoming() {
   const out30 = upcomingCommitments(db, scope, today, addDays(today, 30), today).reduce((s, c) => s + c.amount, 0);
   const items = db.expectedItems.filter((i) => inScope(i.ownerId, scope)).sort((a, b) => Number(b.status === 'active') - Number(a.status === 'active') || a.name.localeCompare(b.name));
 
+  // Link the entry you already made instead of creating a duplicate.
+  const markRecorded = async (o: Occurrence) => {
+    const t = findMatchingTxn(db, o.item, o.date);
+    if (!t) { toast('Couldn’t find the matching entry — use “Add anyway” if it isn’t recorded.', 'error'); return; }
+    await run(() => store.linkOccurrence(o.item.id, o.date, t.id), 'Marked as recorded — nothing new was added');
+  };
+
   const occRow = (o: Occurrence) => (
     <div class="px-item" key={`${o.item.id}-${o.date}`}>
       <div class="px-head-row">
         <div>
           <div class="row-title">{ICON[o.item.kind]} {o.item.name}</div>
-          <div class="px-badges"><Badge tone={o.item.kind === 'salary' ? 'good' : 'info'}>Expected {KIND_LABEL[o.item.kind].toLowerCase()}</Badge>{o.overdue && <Badge tone="warn">Waiting for you</Badge>}</div>
+          <div class="px-badges"><Badge tone={o.item.kind === 'salary' ? 'good' : 'info'}>Expected {KIND_LABEL[o.item.kind].toLowerCase()}</Badge>{o.likelyRecorded ? <Badge tone="good">Looks already recorded</Badge> : o.overdue && <Badge tone="warn">Waiting for you</Badge>}</div>
           <div class="px-sub">{formatDate(o.date)} · {when(o.date, today)} · {personName(db, o.item.ownerId)}{o.item.accountId ? ` · ${accountName(db, o.item.accountId)}` : ''}</div>
         </div>
         <div class={`px-item-amt ${o.item.kind === 'salary' ? 'pos' : ''}`}>{o.item.kind === 'salary' ? '+' : ''}{formatMoney(o.item.amount)}</div>
       </div>
       <div class="px-actions">
-        <Button size="sm" variant="primary" onClick={() => setConfirming(o)}>{o.item.kind === 'salary' ? 'It arrived' : 'Confirm'}</Button>
+        {o.likelyRecorded ? (<>
+          <Button size="sm" variant="primary" onClick={() => markRecorded(o)}>Mark as recorded</Button>
+          <Button size="sm" onClick={() => setConfirming(o)}>Add anyway</Button>
+        </>) : <Button size="sm" variant="primary" onClick={() => setConfirming(o)}>{o.item.kind === 'salary' ? 'It arrived' : 'Confirm'}</Button>}
         <Button size="sm" variant="ghost" onClick={() => run(() => store.skipOccurrence(o.item.id, o.date), 'Skipped this time')}>Skip</Button>
       </div>
     </div>
@@ -108,26 +134,38 @@ function ConfirmSheet({ occ, onClose }: { occ: Occurrence; onClose: () => void }
   const db = useDb(); const store = useStore(); const { busy } = useAction();
   const draft = draftFromOccurrence(occ.item, occ.date);
   const income = draft.type === 'income';
+  const sip = draft.type === 'investment_contribution';
   const [amount, setAmount] = useState<number | undefined>(draft.amount);
   const [date, setDate] = useState(occ.date);
   const [acct, setAcct] = useState((income ? draft.toAccountId : draft.fromAccountId) ?? '');
+  const [cat, setCat] = useState<string>(draft.categoryId ?? '');
+  const [inv, setInv] = useState<string>(draft.investmentId ?? '');
   const [notes, setNotes] = useState('');
   const [issues, setIssues] = useState<{ field: string; message: string }[]>([]);
   const accounts = db.accounts.filter((a) => !a.archived || a.id === acct).map((a) => ({ value: a.id, label: a.name }));
-  const verb = income ? 'received' : draft.type === 'investment_contribution' ? 'invested' : 'paid';
+  const cats = db.categories.filter((c) => c.kind === 'expense' && !c.parentId).map((c) => ({ value: c.id, label: c.name }));
+  const invs = db.investments.filter((i) => !i.archived || i.id === inv).map((i) => ({ value: i.id, label: i.name }));
+  const verb = income ? 'received' : sip ? 'invested' : 'paid';
+  const KNOWN = ['amount', 'date', 'account', 'categoryId', 'investmentId'];
+  const rest = issues.filter((i) => !KNOWN.includes(i.field));
   const save = async () => {
     if (!amount || amount <= 0) { setIssues([{ field: 'amount', message: 'Enter an amount' }]); return; }
-    const r = await store.confirmOccurrence(occ.item.id, occ.date, { amount, date, notes: notes.trim() || undefined, ...(income ? { toAccountId: acct || undefined } : { fromAccountId: acct || undefined }) });
+    const overrides: Partial<Omit<Transaction, 'id' | 'createdAt' | 'updatedAt'>> = { amount, date, notes: notes.trim() || undefined, ...(income ? { toAccountId: acct || undefined } : { fromAccountId: acct || undefined }) };
+    if (!income && !sip) { overrides.categoryId = cat || undefined; if (cat !== draft.categoryId) overrides.subcategoryId = undefined; }
+    if (sip) overrides.investmentId = (inv || undefined) as Id | undefined;
+    const r = await store.confirmOccurrence(occ.item.id, occ.date, overrides);
     if (r.ok) { toast('Recorded'); onClose(); } else setIssues(r.issues.map((i) => ({ ...i, field: i.field === 'fromAccountId' || i.field === 'toAccountId' ? 'account' : i.field })));
   };
   return (
     <Sheet title={`Confirm ${occ.item.name}`} onClose={onClose} footer={<><Button variant="ghost" onClick={onClose}>Not now</Button><Button variant="primary" disabled={busy} onClick={save}>Yes, {verb}</Button></>}>
       <div class="px-form">
-        <div class="px-explain">Nothing is recorded until you confirm. This will create a real {income ? 'income' : draft.type === 'investment_contribution' ? 'investment' : 'expense'} entry — change anything that was different this time.</div>
-        <FormErrors issues={issues} />
+        <div class="px-explain">Nothing is recorded until you confirm. This will create a real {income ? 'income' : sip ? 'investment' : 'expense'} entry — change anything that was different this time.</div>
+        {rest.length > 0 && <div class="banner banner-error" role="alert">{rest.map((i) => i.message).join(' · ')}</div>}
         <MoneyField label="Actual amount" value={amount} onChange={setAmount} error={fieldError(issues, 'amount')} autoFocus big />
         <DateField label={income ? 'Date received' : 'Date paid'} value={date} onChange={setDate} error={fieldError(issues, 'date')} />
         <SelectField label={income ? 'Received in' : 'Paid from'} value={acct || undefined} onChange={setAcct} options={accounts} placeholder="Choose account" error={fieldError(issues, 'account')} />
+        {!income && !sip && <SelectField label="Category" value={cat || undefined} onChange={setCat} options={cats} placeholder="Choose category" error={fieldError(issues, 'categoryId')} />}
+        {sip && <SelectField label="Investment" value={inv || undefined} onChange={setInv} options={invs} placeholder="Choose an investment" error={fieldError(issues, 'investmentId')} />}
         <TextField label="Note (optional)" value={notes} onInput={setNotes} />
       </div>
     </Sheet>

@@ -6,6 +6,7 @@ import { cardMetrics, rewardsEstimate, latestReport } from '../../../domain/card
 import { monthOf } from '../../../domain/dates';
 import { inScope } from '../../../domain/scope';
 import type { Account, CardReport, RewardConfig } from '../../../domain/types';
+import { EmiInLedgerCheck } from '../../quickadd/EmiInstalment';
 import { Note, OwnerBadge } from '../wealth/shared';
 import { navigate } from '../../router';
 import './debt.css';
@@ -132,9 +133,14 @@ function ReportSheet({ accId, onClose }: { accId: string; onClose: () => void })
   const [blocked, setBlocked] = useState<number | undefined>();
   const [notes, setNotes] = useState('');
   const [reconcile, setReconcile] = useState(false);
+  const [emiInLedger, setEmiInLedger] = useState(acc.card?.emiInLedger !== false);
   const [issues, setIssues] = useState<{ field: string; message: string }[]>([]);
 
   const save = async () => {
+    if (acc.card && (acc.card.emiInLedger !== false) !== emiInLedger) {
+      const u = await store.updateAccount(acc.id, { card: { ...acc.card, emiInLedger } });
+      if (!u.ok) { setIssues(u.issues); return; }
+    }
     const r = await store.addCardReport({ accountId: accId, date, source, creditLimit: limit, availableLimit: avail, outstanding: out, nonEmiOutstanding: nonEmi, emiOutstanding: emiOut, emiBlocked: blocked, notes: notes.trim() || undefined }, { reconcile: reconcile && out !== undefined });
     if (!r.ok) { setIssues(r.issues); return; }
     toast('Saved from your bank’s numbers'); onClose();
@@ -149,11 +155,12 @@ function ReportSheet({ accId, onClose }: { accId: string; onClose: () => void })
         <div class="wl-two">
           <MoneyField label="Credit limit" value={limit} onChange={setLimit} error={fieldError(issues, 'creditLimit')} />
           <MoneyField label="Available limit" value={avail} onChange={setAvail} error={fieldError(issues, 'availableLimit')} />
-          <MoneyField label="Total outstanding" value={out} onChange={setOut} error={fieldError(issues, 'outstanding')} />
+          <MoneyField label="Total outstanding" value={out} onChange={setOut} error={fieldError(issues, 'outstanding')} hint="Does your bank’s figure include or exclude EMI principal? Set the checkbox below to match." />
           <MoneyField label="Non-EMI outstanding" value={nonEmi} onChange={setNonEmi} error={fieldError(issues, 'nonEmiOutstanding')} />
           <MoneyField label="EMI outstanding" value={emiOut} onChange={setEmiOut} error={fieldError(issues, 'emiOutstanding')} />
           <MoneyField label="EMI blocked amount" value={blocked} onChange={setBlocked} error={fieldError(issues, 'emiBlocked')} />
         </div>
+        <EmiInLedgerCheck checked={emiInLedger} onChange={setEmiInLedger} />
         <TextField label="Note (optional)" value={notes} onInput={setNotes} />
         <Check label="Also make my tracked outstanding match (adds a correction entry)" checked={reconcile && out !== undefined} onChange={setReconcile} hint={out === undefined ? '(enter total outstanding first)' : undefined} />
         <Note>The correction entry is a balance fix, not an expense or income.</Note>

@@ -62,20 +62,41 @@ type BtnProps = JSX.IntrinsicElements['button'] & { variant?: 'primary' | 'secon
 export function Button({ variant = 'secondary', size = 'md', class: c, type = 'button', ...rest }: BtnProps) {
   return <button type={type} class={cx('btn', `btn-${variant}`, size === 'sm' && 'btn-sm', c as string)} {...rest} />;
 }
+/** Standard radio-group keyboard behaviour: roving tabindex, arrows move focus AND select. */
+function useRadioKeys<T extends string>(options: { value: T }[], value: T | undefined, select: (v: T) => void) {
+  const ref = useRef<HTMLDivElement>(null);
+  const idx = options.findIndex((o) => o.value === value);
+  const tabbable = idx >= 0 ? idx : 0;
+  const onKeyDown = (e: KeyboardEvent) => {
+    const fwd = e.key === 'ArrowRight' || e.key === 'ArrowDown'; const back = e.key === 'ArrowLeft' || e.key === 'ArrowUp';
+    if (!fwd && !back && e.key !== 'Home' && e.key !== 'End') return;
+    if (!options.length) return;
+    e.preventDefault();
+    const cur = (e.target as HTMLElement).closest('[role="radio"]');
+    const from = cur ? Array.from(ref.current?.querySelectorAll('[role="radio"]') ?? []).indexOf(cur) : tabbable;
+    const n = options.length;
+    const next = e.key === 'Home' ? 0 : e.key === 'End' ? n - 1 : (from + (fwd ? 1 : -1) + n) % n;
+    select(options[next].value);
+    requestAnimationFrame(() => (ref.current?.querySelectorAll<HTMLElement>('[role="radio"]')[next])?.focus());
+  };
+  return { ref, tabbable, onKeyDown };
+}
 export function Segmented<T extends string>({ value, options, onChange, label }: { value: T; options: { value: T; label: string }[]; onChange: (v: T) => void; label: string }) {
+  const k = useRadioKeys(options, value, onChange);
   return (
-    <div class="segmented" role="radiogroup" aria-label={label}>
-      {options.map((o) => (
-        <button type="button" key={o.value} role="radio" aria-checked={o.value === value} class={cx('seg', o.value === value && 'seg-on')} onClick={() => onChange(o.value)}>{o.label}</button>
+    <div class="segmented" role="radiogroup" aria-label={label} ref={k.ref} onKeyDown={k.onKeyDown}>
+      {options.map((o, i) => (
+        <button type="button" key={o.value} role="radio" aria-checked={o.value === value} tabIndex={i === k.tabbable ? 0 : -1} class={cx('seg', o.value === value && 'seg-on')} onClick={() => onChange(o.value)}>{o.label}</button>
       ))}
     </div>
   );
 }
 export function Chips<T extends string>({ value, options, onChange, label, allowNone }: { value: T | undefined; options: { value: T; label: string }[]; onChange: (v: T | undefined) => void; label: string; allowNone?: boolean }) {
+  const k = useRadioKeys(options, value, (v) => onChange(v));
   return (
-    <div class="chips" role="radiogroup" aria-label={label}>
-      {options.map((o) => (
-        <button type="button" key={o.value} role="radio" aria-checked={o.value === value} class={cx('chip', o.value === value && 'chip-on')} onClick={() => onChange(allowNone && o.value === value ? undefined : o.value)}>{o.label}</button>
+    <div class="chips" role="radiogroup" aria-label={label} ref={k.ref} onKeyDown={k.onKeyDown}>
+      {options.map((o, i) => (
+        <button type="button" key={o.value} role="radio" aria-checked={o.value === value} tabIndex={i === k.tabbable ? 0 : -1} class={cx('chip', o.value === value && 'chip-on')} onClick={() => onChange(allowNone && o.value === value ? undefined : o.value)}>{o.label}</button>
       ))}
     </div>
   );
@@ -94,6 +115,10 @@ export function Field({ label, error, hint, children, id }: { label: string; err
 }
 export function TextField({ label, value, onInput, error, hint, placeholder, list, autoFocus, maxLength, required }: { label: string; value: string; onInput: (v: string) => void; error?: string; hint?: string; placeholder?: string; list?: string; autoFocus?: boolean; maxLength?: number; required?: boolean }) {
   return <Field label={label} error={error} hint={hint}>{(a) => <input {...a} type="text" value={value} placeholder={placeholder} list={list} autoFocus={autoFocus} maxLength={maxLength} required={required} onInput={(e) => onInput((e.target as HTMLInputElement).value)} autocomplete="off" />}</Field>;
+}
+/** PIN / secret input: masked, numeric keypad on phones, never autofilled or remembered. */
+export function PasswordField({ label, value, onInput, error, hint, maxLength, autoComplete = 'off', autoFocus }: { label: string; value: string; onInput: (v: string) => void; error?: string; hint?: string; maxLength?: number; autoComplete?: 'off' | 'new-password' | 'current-password'; autoFocus?: boolean }) {
+  return <Field label={label} error={error} hint={hint}>{(a) => <input {...a} type="password" inputMode="numeric" autocomplete={autoComplete} value={value} maxLength={maxLength} autoFocus={autoFocus} onInput={(e) => onInput((e.target as HTMLInputElement).value)} />}</Field>;
 }
 export function TextArea({ label, value, onInput, hint }: { label: string; value: string; onInput: (v: string) => void; hint?: string }) {
   return <Field label={label} hint={hint}>{(a) => <textarea {...a} rows={2} value={value} onInput={(e) => onInput((e.target as HTMLTextAreaElement).value)} />}</Field>;

@@ -30,7 +30,8 @@ export function BackupCard() {
     await store.markBackedUp(); toast('Backup downloaded. Keep it somewhere safe — it is not encrypted.');
   };
   const doCsv = () => {
-    const esc = (s: unknown) => `"${String(s ?? '').replace(/"/g, '""')}"`;
+    // Neutralise spreadsheet formula injection: a leading = + - @ tab or CR gets a single quote prefix.
+    const esc = (s: unknown) => { let v = String(s ?? ''); if (/^[=+\-@\t\r]/.test(v) && !/^-?\d+(\.\d+)?$/.test(v)) v = `'${v}`; return `"${v.replace(/"/g, '""')}"`; };
     const name = (id?: string) => db.accounts.find((a) => a.id === id)?.name ?? '';
     const cat = (id?: string) => db.categories.find((c) => c.id === id)?.name ?? '';
     const rows = [['date', 'type', 'amount_inr', 'spending_effect_inr', 'owner', 'category', 'subcategory', 'merchant', 'from_account', 'to_account', 'payment_method', 'tags', 'notes']];

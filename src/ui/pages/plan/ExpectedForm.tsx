@@ -9,6 +9,7 @@ export const KIND_OPTIONS: { value: ExpectedKind; label: string }[] = [
   { value: 'subscription', label: 'Subscription' }, { value: 'sip', label: 'SIP (investment)' }, { value: 'salary', label: 'Salary / income' }, { value: 'bill', label: 'Bill' }, { value: 'other', label: 'Other' },
 ];
 export const KIND_LABEL: Record<ExpectedKind, string> = { subscription: 'Subscription', sip: 'SIP', salary: 'Salary', bill: 'Bill', other: 'Other' };
+const DEFAULT_CAT: Partial<Record<ExpectedKind, string>> = { bill: 'cat_bills', subscription: 'cat_subscriptions', other: 'cat_other' };
 export const FREQ_OPTIONS: { value: Frequency; label: string }[] = [{ value: 'weekly', label: 'Weekly' }, { value: 'monthly', label: 'Monthly' }, { value: 'quarterly', label: 'Every 3 months' }, { value: 'yearly', label: 'Yearly' }];
 export const FREQ_LABEL: Record<Frequency, string> = { weekly: 'weekly', monthly: 'monthly', quarterly: 'quarterly', yearly: 'yearly' };
 
@@ -23,7 +24,7 @@ export function ExpectedFormSheet({ item, defaultKind = 'subscription', lockKind
   const [owner, setOwner] = useState<OwnerId>(item?.ownerId ?? defaultOwner(db, scope));
   const [acct, setAcct] = useState(item?.accountId ?? db.settings.defaults.accountId ?? '');
   const [pm, setPm] = useState<PaymentMethod | ''>(item?.paymentMethod ?? '');
-  const [cat, setCat] = useState(item?.categoryId ?? (defaultKind === 'subscription' ? 'cat_subscriptions' : ''));
+  const [cat, setCat] = useState(item?.categoryId ?? DEFAULT_CAT[item?.kind ?? defaultKind] ?? '');
   const [merchant, setMerchant] = useState(item?.merchant ?? '');
   const [inv, setInv] = useState(item?.investmentId ?? '');
   const [incType, setIncType] = useState(item?.incomeType ?? 'Salary');
@@ -35,8 +36,16 @@ export function ExpectedFormSheet({ item, defaultKind = 'subscription', lockKind
   const invs = db.investments.filter((i) => !i.archived || i.id === item?.investmentId).map((i) => ({ value: i.id, label: i.name }));
   const isIncome = kind === 'salary'; const isSip = kind === 'sip';
 
-  const changeKind = (k: ExpectedKind) => { setKind(k); if (k === 'subscription' && !cat) setCat('cat_subscriptions'); };
+  const changeKind = (k: ExpectedKind) => {
+    // Move the category along with the kind only while it is still the previous kind's default (or empty).
+    if (!cat || cat === DEFAULT_CAT[kind]) setCat(DEFAULT_CAT[k] ?? '');
+    setKind(k);
+  };
   const save = async () => {
+    const missing: { field: string; message: string }[] = [];
+    if (!isIncome && !isSip && !cat) missing.push({ field: 'categoryId', message: 'Choose a category so it lands in the right place when confirmed' });
+    if (isSip && !inv) missing.push({ field: 'investmentId', message: 'Choose which investment this SIP goes into' });
+    if (missing.length) { setIssues(missing); return; }
     const draft: Omit<ExpectedItem, 'id' | 'createdAt' | 'updatedAt'> = {
       kind, name: name.trim(), amount: amount ?? 0, frequency: freq, startDate: start, ownerId: owner,
       accountId: acct || undefined, paymentMethod: !isIncome && pm ? pm : undefined,
@@ -62,9 +71,9 @@ export function ExpectedFormSheet({ item, defaultKind = 'subscription', lockKind
         <SelectField label="Whose is it?" value={owner} onChange={setOwner} options={ownerOptions(db)} />
         <SelectField label={isIncome ? 'Paid into account' : 'Paid from account'} value={acct || undefined} onChange={setAcct} options={accounts} placeholder="Choose account (optional)" />
         {!isIncome && <SelectField label="Payment method" value={pm || undefined} onChange={(v) => setPm(v)} options={Object.entries(PAYMENT_LABELS).map(([value, label]) => ({ value: value as PaymentMethod, label }))} placeholder="Optional" />}
-        {!isIncome && !isSip && <SelectField label="Category" value={cat || undefined} onChange={setCat} options={cats} placeholder="Choose category" />}
+        {!isIncome && !isSip && <SelectField label="Category" value={cat || undefined} onChange={setCat} options={cats} placeholder="Choose category" error={fieldError(issues, 'categoryId')} />}
         {!isIncome && !isSip && <TextField label="Merchant" value={merchant} onInput={setMerchant} placeholder="Optional" />}
-        {isSip && <SelectField label="Investment" value={inv || undefined} onChange={setInv} options={invs} placeholder={invs.length ? 'Choose an investment' : 'No investments yet — add one in Wealth'} hint="The SIP money goes into this holding when you confirm." />}
+        {isSip && <SelectField label="Investment" value={inv || undefined} onChange={setInv} options={invs} placeholder={invs.length ? 'Choose an investment' : 'No investments yet — add one in Wealth'} hint="The SIP money goes into this holding when you confirm." error={fieldError(issues, 'investmentId')} />}
         {isIncome && <SelectField label="Income type" value={incType} onChange={setIncType} options={db.settings.incomeTypes.map((t) => ({ value: t, label: t }))} />}
         <TextArea label="Notes (optional)" value={notes} onInput={setNotes} />
       </div>

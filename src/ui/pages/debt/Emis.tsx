@@ -6,6 +6,7 @@ import { emiState } from '../../../domain/emi';
 import { inScope } from '../../../domain/scope';
 import type { BlockPolicy, Emi, OwnerId } from '../../../domain/types';
 import { Note, OwnerBadge } from '../wealth/shared';
+import { EmiBilledFields } from '../../quickadd/EmiInstalment';
 import { navigate } from '../../router';
 import './debt.css';
 
@@ -109,10 +110,11 @@ function PaySheet({ id, onClose }: { id: string; onClose: () => void }) {
   const s = emiState(e);
   const [date, setDate] = useState(store.today());
   const [amount, setAmount] = useState<number | undefined>(e.emiAmount);
+  const [record, setRecord] = useState(true);
   const [issues, setIssues] = useState<{ field: string; message: string }[]>([]);
   if (!s.nextDueDate) return null;
   const save = async () => {
-    const r = await store.confirmEmiInstalment(id, { dueDate: s.nextDueDate!, date, amount });
+    const r = await store.confirmEmiInstalment(id, { dueDate: s.nextDueDate!, date, amount, recordInterestExpense: record });
     if (!r.ok) { setIssues(r.issues); return; }
     if (emiState(r.value).completed) toast('EMI complete 🎉 Commitment and blocked credit removed');
     else toast('Instalment marked paid');
@@ -124,8 +126,8 @@ function PaySheet({ id, onClose }: { id: string; onClose: () => void }) {
         <FormErrors issues={issues} />
         <p>Instalment due <b>{formatDate(s.nextDueDate)}</b> ({s.monthsCompleted + 1} of {e.tenure}).</p>
         <DateField label="Paid / billed on" value={date} onChange={setDate} />
-        <MoneyField label="Amount" value={amount} onChange={setAmount} hint="Change only if this month’s amount differed." />
-        <Banner tone="info">This does <b>not</b> create an expense. The purchase was already recorded as an expense (if at all), and paying your card bill is a Transfer from your bank to the card.</Banner>
+        <EmiBilledFields e={e} s={s} billed={amount} onBilled={setAmount} record={record} onRecord={setRecord} />
+        <Banner tone="info">Marking this paid does <b>not</b> record the principal again. The purchase was already recorded as an expense (if at all), and paying your card bill is a Transfer from your bank to the card.</Banner>
       </div>
     </Sheet>
   );
