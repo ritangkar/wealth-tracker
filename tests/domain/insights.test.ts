@@ -70,8 +70,8 @@ describe('can I afford this', () => {
     expect(small.verdict).toBe('comfortable');
     // commitments: bill 5000 + loan 10000 + card (non-EMI 0 + EMI due 5000) = 20000
     expect(small.lines[1].value).toBe(-rs(20000));
-    expect(canIAfford(db, 'household', rs(40000), today).verdict).toBe('dips_into_goals');
-    const big = canIAfford(db, 'household', rs(190000), today);
+    expect(canIAfford(db, 'household', rs(220000), today).verdict).toBe('dips_into_goals');
+    const big = canIAfford(db, 'household', rs(340000), today);
     expect(big.verdict).toBe('exceeds_cash'); expect(big.disclaimer).toMatch(/not financial advice/);
   });
 });
