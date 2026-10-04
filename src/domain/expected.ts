@@ -78,10 +78,12 @@ export function upcomingCommitments(db: Database, scope: ViewScope, from: ISODat
   }
   for (const l of db.liabilities) {
     if (!inScope(l.ownerId, scope) || l.status !== 'active' || l.emi <= 0 || !l.paymentDay) continue;
-    let d = addMonths(`${from.slice(0, 7)}-01`, 0);
+    // loans: unpaid EMIs older than the current month are not assumed (payments may simply be unrecorded)
+    const lo = [from, l.baselineDate, `${today.slice(0, 7)}-01`].sort().pop()!;
+    let d = `${lo.slice(0, 7)}-01`;
     for (let k = 0; k < 24; k++, d = addMonths(d, 1)) {
       const due = `${d.slice(0, 7)}-${String(Math.min(l.paymentDay, 28)).padStart(2, '0')}`;
-      if (due < from || due > to || due < l.baselineDate.slice(0, 7) + '-01') continue;
+      if (due < lo || due > to) continue;
       if (l.endDate && due > l.endDate) continue;
       const paid = db.transactions.some((t) => t.type === 'liability_payment' && t.liabilityId === l.id && t.date.slice(0, 7) === due.slice(0, 7));
       if (!paid) out.push({ kind: 'loan', refId: l.id, name: l.name, date: due, amount: l.emi, overdue: due < today });
