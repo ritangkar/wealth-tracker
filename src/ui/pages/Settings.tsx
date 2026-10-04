@@ -7,6 +7,7 @@ import { CategoriesCard } from './settings/Categories';
 import { checkForUpdate } from '../../pwa/register';
 import { sampleDatabase } from '../../data/sample';
 import { navigate } from '../router';
+import { InstallCard } from '../Install';
 
 function PeopleCard() {
   const db = useDb(); const store = useStore();
@@ -106,6 +107,7 @@ export default function Settings() {
       <div class="cols cols-2"><PeopleCard /><LockCard /></div>
       <CategoriesCard />
       <div class="cols cols-2"><IncomeTypesCard /><AppearanceCard /></div>
+      <InstallCard />
       <StorageCard />
       <DangerCard />
       <Card title="About"><p class="muted">Wealth OS tracks, explains and plans — it is a planning aid, not financial advice. No analytics, no accounts, no servers. Cross-device sync isn’t built in; use backup &amp; merge (see docs/SYNC.md).</p></Card>

@@ -1,29 +1,19 @@
 import { useEffect, useState } from 'preact/hooks';
 import type { Store } from '../data/store';
-import { StoreContext, openQuickAdd, setScope, toast, useDb, useScope, useToasts } from './state';
+import { StoreContext, openQuickAdd, setScope, toast, useDb, useToasts } from './state';
 import { navigate, useRoute } from './router';
 import { ROUTES } from './routes';
 import { Banner, Button, Card } from './kit';
 import QuickAdd from './quickadd/QuickAdd';
 import { LockScreen } from './Lock';
+import { InstallBanner } from './Install';
 import { hasPin } from './lock';
 import { applyUpdate, onUpdateState, type UpdateState } from '../pwa/register';
-import type { ViewScope } from '../domain/types';
 
 function useOnline() {
   const [on, set] = useState(navigator.onLine);
   useEffect(() => { const a = () => set(true), b = () => set(false); window.addEventListener('online', a); window.addEventListener('offline', b); return () => { window.removeEventListener('online', a); window.removeEventListener('offline', b); }; }, []);
   return on;
-}
-
-function ScopeSwitch() {
-  const db = useDb(); const [scope, set] = useScope();
-  const opts: { value: ViewScope; label: string }[] = [{ value: 'household', label: 'Household' }, ...db.settings.people.map((p) => ({ value: p.id as ViewScope, label: p.name }))];
-  return (
-    <div class="scope" role="radiogroup" aria-label="Whose finances to show">
-      {opts.map((o) => <button key={o.value} type="button" role="radio" aria-checked={scope === o.value} onClick={() => set(o.value)}>{o.label}</button>)}
-    </div>
-  );
 }
 
 function Recovery({ store }: { store: Store }) {
@@ -113,7 +103,6 @@ function Shell({ store }: { store: Store }) {
         <a class="skip" href="#main" onClick={(e) => { e.preventDefault(); document.getElementById('main')?.focus(); }}>Skip to content</a>
         <div class="topbar">
           <div class="brand-wrap"><div class="brand"><i aria-hidden="true" />Wealth OS</div></div>
-          <ScopeSwitch />
           {!online && <span class="offline-pill" role="status">Offline — all data is local</span>}
         </div>
         <nav class="sidenav" aria-label="Main">
@@ -122,6 +111,7 @@ function Shell({ store }: { store: Store }) {
         </nav>
         <main class="main" id="main" tabIndex={-1}>
           {store.persistError && <Banner tone="error">Your last change could not be saved: {store.persistError}. Export a backup if this keeps happening.</Banner>}
+          {route.path === '/' && <InstallBanner />}
           {isNew && route.path !== '/' && route.path !== '/welcome' && route.path !== '/settings' ? <WelcomeNudge /> : null}
           {Page ? <Page /> : <Card><h2>Page not found</h2><Button onClick={() => navigate('/')}>Go home</Button></Card>}
         </main>

@@ -14,17 +14,12 @@ export function useDb(): Database {
   return store.db;
 }
 
-// ---- view scope (household | p1 | p2), remembered per device
-const KEY = 'wealthos.scope';
-let scope: ViewScope = 'household';
-try { const s = localStorage.getItem(KEY); if (s === 'p1' || s === 'p2' || s === 'household') scope = s; } catch { /* storage unavailable */ }
-const scopeListeners = new Set<() => void>();
-export function setScope(s: ViewScope) { scope = s; try { localStorage.setItem(KEY, s); } catch { /* ignore */ } scopeListeners.forEach((l) => l()); }
-export function useScope(): [ViewScope, (s: ViewScope) => void] {
-  const [, set] = useState(0);
-  useEffect(() => { const l = () => set((n) => n + 1); scopeListeners.add(l); return () => { scopeListeners.delete(l); }; }, []);
-  return [scope, setScope];
-}
+// ---- view scope: the app shows ONE household view. Who did something is chosen per entry (owner field).
+// (Domain functions still accept a person scope; the UI always passes 'household'.)
+try { localStorage.removeItem('wealthos.scope'); } catch { /* storage unavailable */ }
+const HOUSEHOLD: [ViewScope, (s: ViewScope) => void] = ['household', () => undefined];
+export function setScope(_s: ViewScope) { /* single household view */ }
+export function useScope(): [ViewScope, (s: ViewScope) => void] { return HOUSEHOLD; }
 
 export const personName = (db: Database, o: OwnerId | ViewScope): string =>
   o === 'hh' || o === 'household' ? 'Household' : db.settings.people.find((p) => p.id === o)?.name ?? o;

@@ -6,7 +6,7 @@ import type { Database, Id, Transaction, ViewScope } from '../domain/types';
 import { scopedTxns, monthTxns, projectMonthEnd, summarizeMonth, groupSpending } from './cashflow';
 import { spendingOf } from './ledger';
 import { addMonthsKey, monthOf, monthLabel, diffDays, type ISODate, type MonthKey } from './dates';
-import { formatMoney } from './money';
+import { formatMoney, roundRupee } from './money';
 import { wasteMonth } from './waste';
 import { monthlyEquivalent } from './expected';
 
@@ -72,7 +72,7 @@ export function generateInsights(db: Database, scope: ViewScope, today: ISODate)
   const delivery = cur.filter((t) => isSub(t, 'delivery') && spendingOf(t) > 0);
   if (delivery.length >= 3) {
     const total = sumWhere(cur, (t) => isSub(t, 'delivery'));
-    const est = Math.round((total * s.homeCookSavingsPct) / 100);
+    const est = roundRupee((total * s.homeCookSavingsPct) / 100);
     out.push({ id: 'food-delivery', tone: 'info', title: `${delivery.length} food-delivery orders this month (${formatMoney(total)})`,
       body: `Convenience matters — busy days happen. If a few of these were home-cooked, a rough estimate is about ${formatMoney(est)} less, but that is a guess, not a promise.`,
       assumptions: [`Estimate assumes home cooking costs about ${s.homeCookSavingsPct}% less than delivery (adjustable in Settings).`], estimate: true, link: '#/insights', data: { orders: delivery.length, total } });
@@ -81,7 +81,7 @@ export function generateInsights(db: Database, scope: ViewScope, today: ISODate)
   // --- online grocery opportunity
   const online = sumWhere(cur, (t) => isSub(t, 'online_grocery'));
   if (online > 0 && cur.filter((t) => isSub(t, 'online_grocery') && spendingOf(t) > 0).length >= 3) {
-    const est = Math.round((online * s.localMarketSavingsPct) / 100);
+    const est = roundRupee((online * s.localMarketSavingsPct) / 100);
     out.push({ id: 'online-grocery', tone: 'info', title: `Online grocery spend is ${formatMoney(online)} this month`,
       body: `Buying some staples at a local market might cost less — an opportunity of roughly ${formatMoney(est)} if so. We have no price comparison data, so treat this as a possibility to test, not a saving.`,
       assumptions: [`Opportunity assumes about ${s.localMarketSavingsPct}% lower prices at local markets (adjustable). No actual prices were compared.`], estimate: true, link: '#/insights' });

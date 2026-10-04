@@ -17,7 +17,9 @@
 | D13 | EMI credit blocking is a per-EMI policy (`as_paid` default / `on_completion` / manual override) | Issuers differ; always labelled estimate. |
 | D14 | Goal allocations are signed envelope entries, never touching balances | Prevents double counting (I7). |
 | D15 | No card reward rules hard-coded | HDFC site unreachable from the build environment and rules change; the user supplies the rule (blocks, points, value, exclusions). |
-| D16 | Joint (`hh`) is a third owner value; person views exclude joint records, household view includes everything | Ownership stays distinct; no arbitrary 50/50 splitting. |
+| D16 | Joint (`hh`) is a third owner value. **The UI shows a single household view** (no per-person switcher); who did/owns each entry is chosen on the entry and can be filtered in Activity. Domain functions still accept a person scope. | Simpler daily use (user request); ownership stays distinct in data; no arbitrary 50/50 splitting. |
+| D21 | Install prompting: capture `beforeinstallprompt` at module load, Home banner (dismissible, re-asks after 14 days) + Settings card; iPhone Safari gets Add-to-Home-Screen steps | Browsers only offer a one-tap install on Chromium; iOS needs manual steps. |
+| D22 | Projections/estimates are rounded to whole rupees | Avoid implying paise-level precision. |
 | D17 | App lock is UI-only; honest wording | Real at-rest encryption needs a key the user must remember; deferred (see STATUS). |
 | D18 | Backup checksum mismatch is a warning requiring explicit acknowledgement; structural/referential/business-rule failures block | Hand-edited files are legitimate but risky. |
 | D19 | Net-worth history = real daily snapshots only (auto-captured on use) | Never fabricate history. |

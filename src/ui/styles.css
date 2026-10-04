@@ -152,3 +152,11 @@ textarea { resize: vertical; }
 .offline-pill { font-size: .75rem; background: var(--c-warn-soft); color: var(--c-warn); padding: .15rem .6rem; border-radius: 999px; }
 .kv { display: grid; grid-template-columns: 1fr auto; gap: .35rem .75rem; font-size: .95rem; } .kv dt { color: var(--c-muted); } .kv dd { margin: 0; text-align: right; font-variant-numeric: tabular-nums; font-weight: 600; }
 .table-lite { width: 100%; border-collapse: collapse; font-size: .9rem; } .table-lite th, .table-lite td { padding: .45rem .3rem; border-bottom: 1px solid var(--c-border); text-align: right; } .table-lite th:first-child, .table-lite td:first-child { text-align: left; } .table-lite th { color: var(--c-muted); font-weight: 600; font-size: .8rem; }
+
+/* ---- install */
+.install-banner { margin-bottom: .75rem; } .install-actions { display: inline-flex; gap: .4rem; flex-wrap: wrap; }
+.install-steps { margin: .5rem 0 0; padding-left: 1.2rem; display: flex; flex-direction: column; gap: .35rem; }
+/* ---- robustness: nothing may widen the page */
+html, body { max-width: 100%; overflow-x: hidden; }
+.topbar { gap: .5rem; flex-wrap: nowrap; } .brand { white-space: nowrap; }
+img, svg { max-width: 100%; }

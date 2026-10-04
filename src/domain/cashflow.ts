@@ -4,7 +4,7 @@ import { inScope } from './scope';
 import { daysInMonth, monthOf, monthRange, addMonthsKey, parseDate, type ISODate, type MonthKey } from './dates';
 import { expectedOccurrences, isIncomeKind, isSpendingKind } from './expected';
 import type { Paise } from './money';
-import { pct } from './money';
+import { pct, roundRupee } from './money';
 
 export const scopedTxns = (db: Pick<Database, 'transactions'>, scope: ViewScope) => db.transactions.filter((t) => inScope(t.ownerId, scope));
 export const monthTxns = (txns: Transaction[], month: MonthKey) => txns.filter((t) => monthOf(t.date) === month);
@@ -106,12 +106,12 @@ export function projectMonthEnd(db: Database, scope: ViewScope, month: MonthKey,
     pace = priorDaily === null ? actualDaily : w * actualDaily + (1 - w) * priorDaily;
     assumptions.push(priorDaily === null ? 'Day-to-day spending continues at this month’s pace so far.' : `Day-to-day spending blends this month's pace with your ${prior.length}-month average.`);
   }
-  const variableRemaining = Math.round(pace * remainingDays);
+  const variableRemaining = roundRupee(pace * remainingDays);
   assumptions.push('Confirmed one-off purchases are excluded from the pace; recurring items are added from your expected list.');
   if (expectedIncome === 0 && cur.income === 0) assumptions.push('No income recorded or expected yet this month.');
   const projectedIncome = cur.income + expectedIncome;
   const projectedSpending = cur.spending + expectedFixed + variableRemaining;
-  const projectedSavings = projectedIncome - projectedSpending;
+  const projectedSavings = roundRupee(projectedIncome - projectedSpending);
   const gap = target - projectedSavings;
   return { ...base, isCurrent: month === currentMonth, actualIncome: cur.income, actualSpending: cur.spending, savingsSoFar: cur.savings, expectedIncomeRemaining: expectedIncome, expectedFixedRemaining: expectedFixed, variableDailyPace: Math.round(pace), variableRemaining, projectedSavings, gap, onTrack: gap <= 0, assumptions };
 }

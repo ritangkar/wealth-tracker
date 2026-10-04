@@ -86,3 +86,46 @@ test('app lock: set PIN, locked after reload, wrong PIN rejected, right PIN unlo
   await page.getByRole('button', { name: 'Unlock' }).click();
   await expect(page.getByRole('heading', { name: 'Settings & backup' })).toBeVisible();
 });
+
+test('single household view: no person switcher, long names never break the layout, who-did-it chosen per entry', async ({ page }) => {
+  await page.setViewportSize({ width: 360, height: 740 });
+  await fresh(page); await seed(page);
+  await page.evaluate(async () => { const s = window.__store; await s.updateSettings({ people: [{ id: 'p1', name: 'Ritangkarananda', savingsTarget: 5000000 }, { id: 'p2', name: 'Chandrayeeparna', savingsTarget: 1000000 }] }); });
+  await page.reload(); await page.waitForFunction(() => !!window.__store);
+  await expect(page.getByRole('radiogroup', { name: 'Whose finances to show' })).toHaveCount(0);
+  for (const r of ['', '#/activity', '#/plan', '#/settings']) {
+    await page.goto(BASE + r); await page.waitForTimeout(200);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth), r).toBeLessThanOrEqual(1);
+  }
+  await page.goto(BASE);
+  await page.getByRole('button', { name: 'Add transaction' }).click();
+  await expect(page.getByRole('dialog').getByRole('radio', { name: 'Chandrayeeparna' })).toBeVisible();
+});
+
+test('install prompt: banner appears on beforeinstallprompt and triggers the native prompt; hidden when dismissed', async ({ page }) => {
+  await fresh(page);
+  await page.evaluate(() => {
+    (window as any).__prompted = false;
+    const e: any = new Event('beforeinstallprompt', { cancelable: true });
+    e.prompt = async () => { (window as any).__prompted = true; };
+    e.userChoice = Promise.resolve({ outcome: 'accepted' });
+    window.dispatchEvent(e);
+  });
+  const banner = page.getByRole('region', { name: 'Install Wealth OS' });
+  await expect(banner).toBeVisible();
+  await banner.getByRole('button', { name: 'Install' }).click();
+  await expect.poll(() => page.evaluate(() => (window as any).__prompted)).toBe(true);
+  await expect(banner).toBeHidden();
+  // settings always offers a way to install
+  await page.goto(BASE + '#/settings');
+  await expect(page.getByRole('heading', { name: 'Install the app' })).toBeVisible();
+});
+
+test('install guidance on iPhone Safari shows Add to Home Screen steps', async ({ browser }) => {
+  const ctx = await browser.newContext({ userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1', viewport: { width: 390, height: 844 } });
+  const page = await ctx.newPage();
+  await page.goto(BASE); await page.waitForFunction(() => !!window.__store);
+  await page.getByRole('button', { name: 'How to install' }).click();
+  await expect(page.getByText('Add to Home Screen').first()).toBeVisible();
+  await ctx.close();
+});

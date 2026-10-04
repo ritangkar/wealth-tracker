@@ -59,7 +59,7 @@ export function sampleDatabase(today: ISODate, now = new Date().toISOString()): 
     if (day(9) <= today) t({ type: 'expense', date: day(9), amount: rs(Math.round(2400 + rnd() * 800)), ownerId: 'hh', fromAccountId: sav.id, paymentMethod: 'upi', categoryId: 'cat_bills', subcategoryId: 'sub_electricity', merchant: 'Electricity board', recurring: true });
     if (day(10) <= today) t({ type: 'expense', date: day(10), amount: rs(1499), ownerId: 'hh', fromAccountId: sav.id, paymentMethod: 'upi', categoryId: 'cat_bills', subcategoryId: 'sub_internet', merchant: 'Broadband', recurring: true });
     if (day(5) <= today) t({ type: 'liability_payment', date: day(5), amount: rs(10000), fromAccountId: sav.id, liabilityId: loan.id, paymentMethod: 'bank_transfer' });
-    if (m < 0 && day(8) <= today) t({ type: 'cc_settlement', date: addDays(ms, 7), amount: rs(Math.round(26000 + rnd() * 6000)), fromAccountId: sav.id, toAccountId: cc.id, paymentMethod: 'bank_transfer' });
+    if (m < 0 && day(8) <= today) t({ type: 'cc_settlement', date: addDays(ms, 7), amount: rs(Math.round(9000 + rnd() * 2500)), fromAccountId: sav.id, toAccountId: cc.id, paymentMethod: 'bank_transfer' });
   }
   // The baseline for the loan is last month; drop payments on/before baseline from counting twice (ledger ignores them).
 

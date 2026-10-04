@@ -4,6 +4,7 @@ import { Store } from './data/store';
 import { IdbStorage } from './data/idb';
 import { App } from './ui/App';
 import { registerSW } from './pwa/register';
+import './pwa/install'; // start listening for beforeinstallprompt immediately
 
 try { const t = localStorage.getItem('wealthos.theme'); if (t === 'light' || t === 'dark') document.documentElement.setAttribute('data-theme', t); } catch { /* storage unavailable */ }
 

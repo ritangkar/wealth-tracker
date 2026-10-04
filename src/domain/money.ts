@@ -48,3 +48,6 @@ export function splitEvenly(total: Paise, n: number): Paise[] {
 }
 
 export const pct = (part: number, whole: number): number => (whole === 0 ? 0 : (part / whole) * 100);
+
+/** Round to whole rupees — used for projections/estimates, which must not imply paise-level precision. */
+export const roundRupee = (p: Paise): Paise => Math.round(p / 100) * 100;
