@@ -50,6 +50,10 @@ function UpdateBar() {
 }
 
 export function App({ store }: { store: Store }) {
+  return <StoreContext.Provider value={store}><Shell store={store} /></StoreContext.Provider>;
+}
+
+function Shell({ store }: { store: Store }) {
   const route = useRoute();
   const db = useDb();
   const online = useOnline();
@@ -75,7 +79,7 @@ export function App({ store }: { store: Store }) {
 
   if (store.status === 'recovery') return <Recovery store={store} />;
   if (locked === null) return null;
-  if (locked) return <StoreContext.Provider value={store}><LockScreen onUnlock={() => setLocked(false)} /></StoreContext.Provider>;
+  if (locked) return <LockScreen onUnlock={() => setLocked(false)} />;
 
   const def = ROUTES.find((r) => r.path === route.path);
   const Page = def?.component;
@@ -85,7 +89,7 @@ export function App({ store }: { store: Store }) {
   const active = (p: string) => (route.path === p ? 'page' : undefined);
 
   return (
-    <StoreContext.Provider value={store}>
+    <>
       <div class="shell">
         <a class="skip" href="#main" onClick={(e) => { e.preventDefault(); document.getElementById('main')?.focus(); }}>Skip to content</a>
         <div class="topbar">
@@ -113,7 +117,7 @@ export function App({ store }: { store: Store }) {
         <UpdateBar />
         <div class="toasts" aria-live="polite">{toasts.map((t) => <div key={t.id} class={`toast ${t.tone === 'error' ? 'toast-error' : ''}`}>{t.text}</div>)}</div>
       </div>
-    </StoreContext.Provider>
+    </>
   );
 }
 

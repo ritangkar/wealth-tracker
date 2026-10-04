@@ -1,0 +1,44 @@
+/* Page-specific styles for Home, Activity and the Quick Add sheet. */
+
+/* ---- quick add */
+.qa-tabs { margin: 0 -1.25rem; padding: 0 1.25rem 2px; flex-shrink: 0; }
+.qa-form { display: flex; flex-direction: column; gap: .9rem; }
+.qa-label { font-size: .85rem; font-weight: 600; color: var(--c-muted); }
+.qa-label .hint { font-weight: 400; }
+.qa-sub { display: flex; flex-direction: column; gap: .75rem; padding: .85rem; border-radius: var(--radius-sm); background: var(--c-surface-2); }
+.qa-inline { display: flex; gap: .4rem; align-items: flex-end; flex-wrap: wrap; } .qa-inline .field { flex: 1; min-width: 10rem; }
+.qa-note { font-size: .88rem; padding: .65rem .85rem; border-radius: var(--radius-sm); background: var(--c-info-soft); }
+.qa-note-good { background: var(--c-good-soft); } .qa-note-warn { background: var(--c-warn-soft); }
+.qa-event { display: flex; gap: .5rem; align-items: center; font-size: .9rem; }
+.qa-stats { display: grid; grid-template-columns: 1fr auto; gap: .2rem .75rem; font-size: .92rem; } .qa-stats b { font-variant-numeric: tabular-nums; text-align: right; }
+.neg-warn { color: var(--c-warn); }
+.qa-bar { position: sticky; bottom: 0; z-index: 2; display: flex; gap: .5rem; align-items: center; justify-content: flex-end; flex-wrap: wrap;
+  margin: .25rem -1.25rem -1rem; padding: .75rem 1.25rem calc(.75rem + env(safe-area-inset-bottom)); background: var(--c-surface); border-top: 1px solid var(--c-border); }
+.qa-spacer { flex: 1; }
+
+/* ---- home */
+.home-hero { gap: .5rem; }
+.home-hero-top { display: flex; justify-content: space-between; align-items: flex-end; gap: .75rem; flex-wrap: wrap; }
+.home-hero .hero { line-height: 1.1; }
+.home-sub { display: flex; gap: 1.25rem; flex-wrap: wrap; font-size: .9rem; color: var(--c-muted); } .home-sub b { color: var(--c-text); font-variant-numeric: tabular-nums; }
+.home-month-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: .5rem; }
+.home-proj { display: flex; flex-direction: column; gap: .4rem; padding: .85rem; border-radius: var(--radius-sm); background: var(--c-surface-2); }
+.home-proj-line { display: flex; justify-content: space-between; gap: .75rem; align-items: baseline; flex-wrap: wrap; } .home-proj-line b { font-size: 1.2rem; font-variant-numeric: tabular-nums; }
+.home-note { display: flex; gap: .5rem; align-items: center; flex-wrap: wrap; font-size: .9rem; }
+.home-note-edit { display: flex; gap: .4rem; align-items: flex-end; } .home-note-edit .field { flex: 1; }
+.home-due { display: flex; gap: .5rem; align-items: center; }
+.home-due .row { flex: 1; }
+.home-more-title { margin-top: .5rem; font-size: .8rem; text-transform: uppercase; letter-spacing: .06em; color: var(--c-muted); }
+.home-cmp { font-size: .88rem; color: var(--c-muted); }
+
+/* ---- activity */
+.act-head { display: flex; flex-direction: column; gap: .75rem; }
+.act-month { display: flex; align-items: center; justify-content: space-between; gap: .5rem; }
+.act-month strong { flex: 1; text-align: center; font-size: 1.05rem; }
+.act-totals { display: grid; grid-template-columns: repeat(3, 1fr); gap: .5rem; }
+.act-filters { display: flex; flex-direction: column; gap: .75rem; }
+.act-day { display: flex; justify-content: space-between; font-size: .8rem; font-weight: 650; color: var(--c-muted); padding: .75rem .25rem .25rem; text-transform: uppercase; letter-spacing: .04em; }
+.act-list { padding-top: .25rem; padding-bottom: .25rem; }
+.act-title { display: flex; flex-wrap: wrap; gap: .3rem; align-items: center; }
+.act-amt-pos { color: var(--c-good); } .act-amt-neutral { color: var(--c-muted); }
+.act-more { display: flex; justify-content: center; padding: .5rem; }

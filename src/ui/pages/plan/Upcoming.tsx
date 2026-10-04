@@ -19,7 +19,7 @@ export default function Upcoming() {
   const [editing, setEditing] = useState<ExpectedItem | 'new' | null>(null);
   const [ask, dialog] = useConfirm(); const { run } = useAction();
 
-  const occ = expectedOccurrences(db, scope, addDays(today, -60), addDays(today, 45), today).filter((o) => o.state === 'pending');
+  const occ = expectedOccurrences(db, scope, addDays(today, -31), addDays(today, 45), today).filter((o) => o.state === 'pending');
   const overdue = occ.filter((o) => o.overdue);
   const soon = occ.filter((o) => !o.overdue && o.date <= addDays(today, 7));
   const later = occ.filter((o) => !o.overdue && o.date > addDays(today, 7));

@@ -7,6 +7,7 @@ import { addMonthsKey, monthOf } from '../../../domain/dates';
 import { compareMonth, monthlySeries, projectMonthEnd, scopedTxns, summarizeMonth, type MonthSummary } from '../../../domain/cashflow';
 import './plan.css';
 
+const rm = (p: number) => formatMoney(Math.round(p / 100) * 100);
 const pctText = (p: number | null) => (p === null ? '—' : `${p > 0 ? '+' : ''}${Math.round(p)}%`);
 
 export default function Savings() {
@@ -47,18 +48,18 @@ export default function Savings() {
 
     <Card title="Where this month is heading" tone="soft" action={<Badge tone="info">Estimate</Badge>}>
       <div class="px-stats">
-        <Stat label="Projected month-end savings" value={formatMoney(proj.projectedSavings)} tone={proj.onTrack ? 'good' : undefined} />
+        <Stat label="Projected month-end savings" value={rm(proj.projectedSavings)} tone={proj.onTrack ? 'good' : undefined} />
         <Stat label={`Target${scope === 'household' ? '' : ' (personal)'}`} value={formatMoney(proj.target)} sub={proj.minimum !== null ? `Comfortable minimum ${formatMoney(proj.minimum)}` : undefined} />
       </div>
       {proj.onTrack
-        ? <Banner tone="good">On track. If the rest of the month looks like the picture so far, you would finish about {formatMoney(-proj.gap)} above target.</Banner>
-        : <Banner>About {formatMoney(proj.gap)} below target at the current pace. A lower-saving month is not a failure — festivals, travel and one-off costs are part of real life, and this can still move before month-end.</Banner>}
+        ? <Banner tone="good">On track. If the rest of the month looks like the picture so far, you would finish about {rm(-proj.gap)} above target.</Banner>
+        : <Banner>About {rm(proj.gap)} below target at the current pace. A lower-saving month is not a failure — festivals, travel and one-off costs are part of real life, and this can still move before month-end.</Banner>}
       <Disclosure summary="How this estimate works">
         <ul class="px-list">
           {proj.assumptions.map((a) => <li key={a}>{a}</li>)}
           {proj.expectedIncomeRemaining > 0 && <li>Expected income still to arrive: {formatMoney(proj.expectedIncomeRemaining)}.</li>}
           {proj.expectedFixedRemaining > 0 && <li>Expected bills and subscriptions still to come: {formatMoney(proj.expectedFixedRemaining)}.</li>}
-          {proj.variableRemaining > 0 && <li>Day-to-day spending for the rest of the month: about {formatMoney(proj.variableRemaining)} ({formatMoney(proj.variableDailyPace)} a day).</li>}
+          {proj.variableRemaining > 0 && <li>Day-to-day spending for the rest of the month: about {rm(proj.variableRemaining)} ({rm(proj.variableDailyPace)} a day).</li>}
         </ul>
       </Disclosure>
     </Card>
@@ -95,7 +96,7 @@ export default function Savings() {
         ? <BarChart data={series.map((s) => ({ label: lab(s), value: s.income, value2: s.spending }))} legend={['Income', 'Spending']} summary={`Income and spending for the last six months. ${series.map((s) => `${monthLabel(s.month)}: income ${formatMoney(s.income)}, spending ${formatMoney(s.spending)}`).join('; ')}.`} />
         : <BarChart data={series.map((s) => ({ label: lab(s), value: Math.max(0, s.savings) }))} target={proj.target > 0 ? proj.target : undefined} summary={`Savings for the last six months against a ${formatMoney(proj.target)} target. ${series.map((s) => `${monthLabel(s.month)}: ${formatMoney(s.savings)}`).join('; ')}.`} />}
       <p class="px-summary">
-        {(() => { const done = series.slice(0, -1); const avg = done.length ? Math.round(done.reduce((a, s) => a + s.savings, 0) / done.length) : 0; return `Finished months averaged ${formatMoney(avg)} saved. Months below zero are drawn as empty bars.`; })()}
+        {(() => { const done = series.slice(0, -1); const avg = done.length ? Math.round(done.reduce((a, s) => a + s.savings, 0) / done.length) : 0; return `Finished months averaged ${rm(avg)} saved. Months below zero are drawn as empty bars.`; })()}
       </p>
     </Card>
 

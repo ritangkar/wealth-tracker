@@ -1,0 +1,6 @@
+.db-util { display: flex; flex-direction: column; gap: .35rem; }
+.db-util-head { display: flex; justify-content: space-between; gap: .5rem; font-size: .9rem; }
+.db-rewards { padding: .7rem .8rem; border-radius: var(--radius-sm); background: var(--c-surface-2); font-size: .92rem; }
+.db-rewards p { margin: .2rem 0 0; }
+.db-sub { margin-top: .5rem; color: var(--c-muted); font-size: .95rem; }
+.db-total { display: flex; flex-direction: column; gap: .25rem; }

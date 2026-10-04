@@ -40,7 +40,7 @@ export default function ExpenseForm({ editId, onClose, scope }: FormProps) {
     return db.categories.filter((c) => c.kind === 'expense' && !c.parentId).map((c, i) => ({ c, i, n: use.get(c.id) ?? 0 }))
       .sort((a, b) => b.n - a.n || a.i - b.i).map((x) => x.c);
   }, [db.categories, db.transactions]);
-  const subs = db.categories.filter((c) => c.parentId === cat);
+  const subs = cat ? db.categories.filter((c) => c.parentId === cat) : [];
 
   // Known merchants and the category each was last filed under.
   const { merchants, lastBy } = useMemo(() => {
