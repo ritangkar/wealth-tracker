@@ -5,6 +5,8 @@ import { IdbStorage } from './data/idb';
 import { App } from './ui/App';
 import { registerSW } from './pwa/register';
 
+try { const t = localStorage.getItem('wealthos.theme'); if (t === 'light' || t === 'dark') document.documentElement.setAttribute('data-theme', t); } catch { /* storage unavailable */ }
+
 async function boot() {
   const root = document.getElementById('app')!;
   try {

@@ -1,0 +1,15 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Wealth OS</title></head>
+<body style="font-family:system-ui;padding:2rem;max-width:36rem;margin:auto">
+<h1>Page not found</h1>
+<p id="m">This address doesn’t exist. <a id="a" href="./">Open Wealth OS</a>.</p>
+<script>
+  // GitHub Pages project sites live at /<repo>/ ; send stray paths back to the app root (guarded against loops).
+  (function () {
+    var seg = location.pathname.split('/').filter(Boolean)[0];
+    var target = seg && !/\.[a-z0-9]+$/i.test(seg) ? '/' + seg + '/' : '/';
+    document.getElementById('a').href = target;
+    if (location.pathname !== target && !location.search.includes('r=1')) location.replace(target + '?r=1');
+  })();
+</script>
+</body></html>

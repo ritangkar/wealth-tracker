@@ -13,7 +13,7 @@ const glyph = (pad) => `
 </svg>`;
 
 mkdirSync('public/icons', { recursive: true });
-const browser = await chromium.launch({ executablePath: process.env.CHROMIUM_PATH ?? (process.platform === 'linux' ? '/opt/pw-browsers/chromium' : undefined) });
+const browser = await chromium.launch({ executablePath: process.env.CHROMIUM_PATH || (process.platform === 'linux' ? '/opt/pw-browsers/chromium' : undefined) });
 const page = await browser.newPage();
 async function render(file, size, pad) {
   await page.setViewportSize({ width: size, height: size });
