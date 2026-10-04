@@ -7,6 +7,7 @@ const set = (p: Partial<UpdateState>) => { state = { ...state, ...p }; listeners
 export const onUpdateState = (l: Listener) => { listeners.add(l); l(state); return () => { listeners.delete(l); }; };
 
 let reg: ServiceWorkerRegistration | undefined;
+let updateRequested = false;
 export async function registerSW(): Promise<void> {
   if (!('serviceWorker' in navigator) || import.meta.env.DEV) return;
   try {
@@ -24,11 +25,11 @@ export async function registerSW(): Promise<void> {
     reg.addEventListener('updatefound', () => track(reg!.installing));
     // reload only when an UPDATE replaces an existing controller (not on first install's clients.claim())
     let reloading = false; const hadController = !!navigator.serviceWorker.controller;
-    navigator.serviceWorker.addEventListener('controllerchange', () => { if (reloading || !hadController) return; reloading = true; location.reload(); });
+    navigator.serviceWorker.addEventListener('controllerchange', () => { if (reloading || !(hadController || updateRequested)) return; reloading = true; location.reload(); });
     // check for a new deploy when the app returns to the foreground and hourly
     document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') void reg?.update().catch(() => {}); });
     setInterval(() => void reg?.update().catch(() => {}), 60 * 60 * 1000);
   } catch (e) { console.warn('Service worker registration failed', e); }
 }
 export const checkForUpdate = async () => { await reg?.update(); };
-export function applyUpdate() { state.waiting?.postMessage('SKIP_WAITING'); }
+export function applyUpdate() { updateRequested = true; state.waiting?.postMessage('SKIP_WAITING'); }

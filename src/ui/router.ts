@@ -12,7 +12,9 @@ export function useRoute(): Route {
   const [r, set] = useState(() => parseHash(location.hash));
   useEffect(() => {
     const on = () => { set(parseHash(location.hash)); window.scrollTo(0, 0); };
-    window.addEventListener('hashchange', on); return () => window.removeEventListener('hashchange', on);
+    window.addEventListener('hashchange', on);
+    set(parseHash(location.hash)); // catch a change that happened before this effect subscribed
+    return () => window.removeEventListener('hashchange', on);
   }, []);
   return r;
 }

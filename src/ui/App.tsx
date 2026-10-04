@@ -103,7 +103,7 @@ function Shell({ store }: { store: Store }) {
         </nav>
         <main class="main" id="main" tabIndex={-1}>
           {store.persistError && <Banner tone="error">Your last change could not be saved: {store.persistError}. Export a backup if this keeps happening.</Banner>}
-          {isNew && route.path !== '/welcome' && route.path !== '/settings' ? <WelcomeNudge /> : null}
+          {isNew && route.path !== '/' && route.path !== '/welcome' && route.path !== '/settings' ? <WelcomeNudge /> : null}
           {Page ? <Page /> : <Card><h2>Page not found</h2><Button onClick={() => navigate('/')}>Go home</Button></Card>}
         </main>
         <nav class="bottomnav" aria-label="Main">

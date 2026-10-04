@@ -37,7 +37,7 @@ test('quick add expense: owner and funding account stay distinct; appears in Act
   await dialog.getByRole('radio', { name: 'Groceries' }).click();
   await dialog.getByLabel('Merchant').fill('Blinkit');
   await dialog.getByRole('radio', { name: 'Wife' }).click();
-  await dialog.getByRole('radio', { name: 'UPI' }).click();
+  await expect(dialog.getByRole('radio', { name: 'UPI' })).toHaveAttribute('aria-checked', 'true'); // sensible default
   await dialog.getByRole('button', { name: /^Save/ }).first().click();
   await expect.poll(() => page.evaluate(() => window.__store.db.transactions.length)).toBe(1);
   const t = await page.evaluate(() => window.__store.db.transactions[0]);
@@ -75,12 +75,14 @@ test('app lock: set PIN, locked after reload, wrong PIN rejected, right PIN unlo
   await page.getByRole('button', { name: 'Set a PIN' }).click();
   await page.getByLabel('New PIN (4–8 digits)').fill('2468');
   await page.getByLabel('Repeat new PIN').fill('2468');
-  await page.getByRole('button', { name: 'Save', exact: true }).click();
+  await page.getByRole('dialog').getByRole('button', { name: 'Save', exact: true }).click();
   await expect(page.getByText('App lock is on.')).toBeVisible();
   await page.reload();
   await expect(page.getByRole('heading', { name: 'Wealth OS is locked' })).toBeVisible();
   for (const d of '1357') await page.getByRole('button', { name: d, exact: true }).click();
-  await expect(page.getByText('That PIN did not match.').or(page.getByRole('heading', { name: 'Wealth OS is locked' }))).toBeVisible();
+  await page.getByRole('button', { name: 'Unlock' }).click();
+  await expect(page.getByText('That PIN did not match.')).toBeVisible();
   for (const d of '2468') await page.getByRole('button', { name: d, exact: true }).click();
+  await page.getByRole('button', { name: 'Unlock' }).click();
   await expect(page.getByRole('heading', { name: 'Settings & backup' })).toBeVisible();
 });

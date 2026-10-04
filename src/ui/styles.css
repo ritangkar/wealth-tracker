@@ -51,7 +51,7 @@ a { color: var(--c-primary); }
   .main { margin-left: var(--side-w); max-width: none; padding: 1.5rem 2rem 3rem; }
   .main > * { max-width: 980px; }
   .bottomnav { display: none; }
-  .sidenav { display: flex; flex-direction: column; gap: .15rem; position: fixed; top: 58px; bottom: 0; left: 0; width: var(--side-w); padding: 1rem .75rem; border-right: 1px solid var(--c-border); background: var(--c-surface); overflow-y: auto; }
+  .sidenav { display: flex; flex-direction: column; gap: .15rem; position: fixed; top: 78px; bottom: 0; left: 0; width: var(--side-w); padding: 1rem .75rem; border-right: 1px solid var(--c-border); background: var(--c-surface); overflow-y: auto; }
   .sidenav a { display: flex; gap: .65rem; align-items: center; padding: .6rem .75rem; border-radius: 10px; color: var(--c-text); text-decoration: none; min-height: 44px; }
   .sidenav a:hover { background: var(--c-surface-2); } .sidenav a[aria-current='page'] { background: var(--c-primary-soft); color: var(--c-primary); font-weight: 650; }
   .sidenav .add-btn { margin-bottom: .75rem; }

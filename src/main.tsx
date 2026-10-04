@@ -13,6 +13,7 @@ async function boot() {
     const storage = new IdbStorage();
     const store = await Store.open(storage, { appVersion: __APP_VERSION__ });
     void storage.persist();
+    root.textContent = ''; // remove the static "Loading…" placeholder
     render(<App store={store} />, root);
     void registerSW();
     (window as unknown as { __store?: Store }).__store = store; // handy for debugging / e2e; contains no secrets beyond what's on screen
