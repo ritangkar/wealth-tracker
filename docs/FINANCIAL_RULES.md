@@ -20,7 +20,7 @@ Fields that carry meaning separately: `ownerId` (who spent/earned), `fromAccount
 A credit-card purchase is an `expense` whose funding account has kind `credit_card` (helper `isCardPurchase`).
 
 ## Account balances
-`balance = openingBalance + Σ effects` (signed). Card balance is negative = outstanding. Overdraft/negative bank counts as liability; overpaid card counts as asset.
+`balance = openingBalance (as at the START of openingDate) + Σ effects of transactions dated on/after openingDate and on/before today` (signed). Earlier transactions are history only (already inside the opening balance); future-dated ones don't change today's figures. Card balance is negative = outstanding. Overdraft/negative bank counts as liability; overpaid card counts as asset.
 
 ## Invariants
 - I1 spending = Σexpense + Σinterest(liability_payment) − Σrefund. Nothing else.
@@ -33,3 +33,15 @@ A credit-card purchase is an `expense` whose funding account has kind `credit_ca
 - I8 Waste ≠ spending.
 - I9 Expected items generate *occurrences*, not transactions.
 - I10 Savings = income − spending (period). Projection method is explicit & shown with assumptions.
+
+## Card EMI balance semantics
+`card.emiInLedger` (default true): the tracked card balance already includes remaining EMI principal (non-EMI = ledger − EMI). If false (bank app shows "outstanding excluding EMI"), non-EMI = ledger, total = ledger + EMI principal, and net worth adds the EMI principal as a card liability. Reconcile always matches the *ledger* to the reported outstanding.
+
+## EMI interest / fees
+Confirming an instalment never creates a transaction. If the amount billed exceeds the scheduled principal the user may opt in to record the extra as an expense in 'Fees & interest' on the card (`recordInterestExpense`). Principal is never an expense.
+
+## Projection hygiene
+Variable pace excludes one-off, recurring-flagged, and expected-item-linked spending. Pending expected occurrences that match an unlinked manual transaction this month (`likelyRecorded`) are not added again; the UI offers "Mark as recorded" (`linkOccurrence`) instead of creating a duplicate.
+
+## Merge
+Union by id, newer wins, tombstones honoured; a deleted parent that surviving records still reference is kept (and reported) instead of failing or dropping records.

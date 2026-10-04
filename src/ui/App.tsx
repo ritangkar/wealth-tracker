@@ -28,13 +28,20 @@ function ScopeSwitch() {
 
 function Recovery({ store }: { store: Store }) {
   const r = store.recovery!;
+  const [msg, setMsg] = useState('');
+  const repair = async () => {
+    const res = await store.attemptRepair();
+    setMsg(res.ok ? (res.value.dropped.length ? `Opened. Removed ${res.value.dropped.length} broken record(s); a safety copy was kept.` : 'Opened.') : res.issues[0].message);
+  };
   const download = () => { const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([r.raw], { type: 'application/json' })); a.download = 'wealth-os-raw-stored-data.json'; a.click(); };
   return (
     <div class="fullscreen"><Card>
       <h1>We couldn’t open your data safely</h1>
       <Banner tone="error">Nothing has been changed or deleted. The app is paused so it can’t overwrite anything.</Banner>
       <ul>{r.errors.slice(0, 8).map((e, i) => <li key={i}>{e}</li>)}</ul>
-      <Button onClick={download}>Download what’s stored (JSON)</Button>
+      <div class="page-actions"><Button onClick={download}>Download what’s stored (JSON)</Button>{r.rawData !== undefined && r.storedVersion === 1 && <Button variant="primary" onClick={repair}>Repair and open</Button>}</div>
+      {msg && <Banner tone="warn">{msg}</Banner>}
+      <p class="hint">“Repair and open” keeps a safety copy first, then removes only records that point to things that no longer exist (this can happen if two tabs were edited at once).</p>
       <p class="muted">If this happened after an app update, reloading or updating the app may fix it. You can also keep the downloaded file for support.</p>
     </Card></div>
   );

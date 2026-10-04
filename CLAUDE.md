@@ -33,6 +33,8 @@ See `docs/FINANCIAL_RULES.md` for full detail. Headlines:
 7. Expected/recurring items never fabricate transactions; user confirms.
 8. Restore never silently destroys data: validate → preview → auto safety-snapshot → apply.
 9. Never store card numbers, CVV, PINs, passwords.
+10. Opening balance is as-at-start of `openingDate`; earlier transactions are history only. Balances/net worth ignore future-dated entries.
+11. Imports must pass the same value rules as the forms (`validateDatabase`); recovery mode never writes, repair keeps a safety copy first.
 
 ## Tone rules for insights
 Non-judgmental, explain assumptions, label estimates as estimates, never claim savings without price data.
