@@ -90,7 +90,7 @@ export default function Goals() {
 }
 
 function GoalSheet({ goal, onClose }: { goal?: Goal; onClose: () => void }) {
-  const db = useDb(); const store = useStore(); const [scope] = useScope(); const { busy, run } = useAction();
+  const db = useDb(); const store = useStore(); const [scope] = useScope(); const { busy } = useAction();
   const [name, setName] = useState(goal?.name ?? '');
   const [kind, setKind] = useState<GoalKind>(goal?.kind ?? 'other');
   const [owner, setOwner] = useState<OwnerId>(goal?.ownerId ?? (scope === 'household' ? 'hh' : defaultOwner(db, scope)));
@@ -126,7 +126,7 @@ function GoalSheet({ goal, onClose }: { goal?: Goal; onClose: () => void }) {
 }
 
 function AllocSheet({ goal, release, onClose }: { goal: Goal; release: boolean; onClose: () => void }) {
-  const db = useDb(); const store = useStore(); const { busy, run } = useAction();
+  const db = useDb(); const store = useStore(); const { busy } = useAction();
   const today = store.today();
   const [mode, setMode] = useState<'add' | 'release'>(release ? 'release' : 'add');
   const [amt, setAmt] = useState<number | undefined>();

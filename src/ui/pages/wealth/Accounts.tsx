@@ -119,7 +119,7 @@ function AccountForm({ id, onClose }: { id?: string; onClose: () => void }) {
         <SelectField label="Kind" value={kind} onChange={setKind} options={KIND_OPTIONS} error={fieldError(issues, 'kind')} hint={hasTxns ? 'Kind can’t change once an account has transactions.' : 'UPI is not an account — pick the bank account that UPI draws from.'} />
         <SelectField label="Owner" value={owner} onChange={(v) => setOwner(v as OwnerId)} options={ownerOptions(db)} />
         <div class="wl-two">
-          <MoneyField label={isCard ? 'Amount owed as of the date' : 'Opening balance'} value={opening} onChange={setOpening} allowNegative={!isCard} error={fieldError(issues, 'openingBalance')} hint={isCard ? 'Enter what you owe as a positive amount.' : 'The balance on the date →'} />
+          <MoneyField label={isCard ? 'Amount owed as of the date' : 'Opening balance'} value={opening} onChange={setOpening} allowNegative={!isCard} error={fieldError(issues, 'openingBalance')} hint={isCard ? 'Enter what you owe as a positive amount.' : 'Balance as of the date on the right'} />
           <DateField label={isCard ? 'As of' : 'Balance as of'} value={openingDate} onChange={setOpeningDate} />
         </div>
         {isCard && (

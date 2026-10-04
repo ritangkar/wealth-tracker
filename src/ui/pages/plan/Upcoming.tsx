@@ -109,7 +109,7 @@ function ConfirmSheet({ occ, onClose }: { occ: Occurrence; onClose: () => void }
   const draft = draftFromOccurrence(occ.item, occ.date);
   const income = draft.type === 'income';
   const [amount, setAmount] = useState<number | undefined>(draft.amount);
-  const [date, setDate] = useState(occ.overdue ? occ.date : occ.date);
+  const [date, setDate] = useState(occ.date);
   const [acct, setAcct] = useState((income ? draft.toAccountId : draft.fromAccountId) ?? '');
   const [notes, setNotes] = useState('');
   const [issues, setIssues] = useState<{ field: string; message: string }[]>([]);
