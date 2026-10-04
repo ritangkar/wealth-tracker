@@ -1,6 +1,9 @@
 import { defineConfig, devices } from '@playwright/test';
+import { existsSync } from 'node:fs';
 
-const launchOptions = { executablePath: process.env.CHROMIUM_PATH || (process.platform === 'linux' ? '/opt/pw-browsers/chromium' : undefined), args: ['--no-sandbox'] };
+// Use a pre-installed Chromium only if one exists (e.g. the dev sandbox); on CI Playwright uses its own downloaded browser.
+const preinstalled = process.env.CHROMIUM_PATH || '/opt/pw-browsers/chromium';
+const launchOptions = { executablePath: existsSync(preinstalled) ? preinstalled : undefined, args: ['--no-sandbox'] };
 export default defineConfig({
   testDir: 'tests/e2e',
   timeout: 45_000,

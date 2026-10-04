@@ -1,6 +1,6 @@
 // Renders public/icons/*.png from an inline SVG using the preinstalled Chromium (via Playwright).
 import { chromium } from '@playwright/test';
-import { mkdirSync } from 'node:fs';
+import { mkdirSync, existsSync } from 'node:fs';
 
 const glyph = (pad) => `
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
@@ -13,7 +13,7 @@ const glyph = (pad) => `
 </svg>`;
 
 mkdirSync('public/icons', { recursive: true });
-const browser = await chromium.launch({ executablePath: process.env.CHROMIUM_PATH || (process.platform === 'linux' ? '/opt/pw-browsers/chromium' : undefined) });
+const browser = await chromium.launch({ executablePath: [process.env.CHROMIUM_PATH, '/opt/pw-browsers/chromium'].find((p) => p && existsSync(p)) });
 const page = await browser.newPage();
 async function render(file, size, pad) {
   await page.setViewportSize({ width: size, height: size });

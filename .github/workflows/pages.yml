@@ -6,7 +6,7 @@ on:
 permissions: { contents: read, pages: write, id-token: write }
 concurrency: { group: pages, cancel-in-progress: false }
 jobs:
-  test:
+  check:            # fast gate: types + unit tests + production build. Deploy depends only on this.
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -15,23 +15,33 @@ jobs:
       - run: npm ci
       - run: npm run typecheck
       - run: npm test
-      - run: npx playwright install --with-deps chromium
-      - run: npm run test:e2e
-        env: { CHROMIUM_PATH: '' }
-  deploy:
-    needs: test
-    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+      - run: npm run build
+        env: { BUILD_ID: '${{ github.sha }}' }
+      - name: Sanity-check the built site
+        run: |
+          test -f dist/index.html && test -f dist/sw.js && test -f dist/manifest.webmanifest
+          ! grep -q '/src/main.tsx' dist/index.html
+          grep -q 'assets/' dist/index.html
+      - uses: actions/configure-pages@v5
+        if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+      - uses: actions/upload-pages-artifact@v3
+        if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+        with: { path: dist }
+  e2e:              # PWA / offline / subpath tests in a real browser (reported separately; does not block deploy)
     runs-on: ubuntu-latest
-    environment: { name: github-pages, url: '${{ steps.deployment.outputs.page_url }}' }
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with: { node-version: 22, cache: npm }
       - run: npm ci
-      - run: npm run build   # base './' → works under /<repo>/ ; BUILD_ID defaults to a timestamp hash
-        env: { BUILD_ID: '${{ github.sha }}' }
-      - uses: actions/configure-pages@v5
-      - uses: actions/upload-pages-artifact@v3
-        with: { path: dist }
+      - run: npx playwright install --with-deps chromium
+      - run: npm run test:e2e
+        env: { CI: 'true' }
+  deploy:
+    needs: check
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    environment: { name: github-pages, url: '${{ steps.deployment.outputs.page_url }}' }
+    steps:
       - id: deployment
         uses: actions/deploy-pages@v4
