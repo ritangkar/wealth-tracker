@@ -2,6 +2,7 @@ import type { Database, NetWorthSnapshot, OwnerId, ViewScope } from './types';
 import { accountBalances } from './ledger';
 import { holdingValue } from './holdings';
 import { liabilityOutstanding } from './liabilities';
+import { emiState } from './emi';
 import { inScope } from './scope';
 import type { Paise } from './money';
 import type { ISODate } from './dates';
@@ -16,11 +17,16 @@ export interface NetWorth {
 export function computeNetWorth(db: Database, scope: ViewScope, asOf?: ISODate): NetWorth {
   const a = { bank: 0, cash: 0, brokerageCash: 0, investments: 0, gold: 0, property: 0, other: 0, total: 0 };
   const l = { cards: 0, loans: 0, overdrafts: 0, total: 0 };
-  const bal = accountBalances(db, asOf);
+  const bal = accountBalances(db, asOf);  // asOf defaults to today
   for (const acc of db.accounts) {
     if (!inScope(acc.ownerId, scope)) continue;
     const b = bal.get(acc.id) ?? 0;
-    if (acc.kind === 'credit_card') { if (b < 0) l.cards += -b; else a.bank += b; continue; }
+    if (acc.kind === 'credit_card') {
+      if (b < 0) l.cards += -b; else a.bank += b;
+      // if the tracked balance excludes EMI principal, that debt still exists: add it
+      if (acc.card?.emiInLedger === false) for (const e of db.emis) if (e.cardAccountId === acc.id) l.cards += emiState(e).outstanding;
+      continue;
+    }
     if (b < 0) { l.overdrafts += -b; continue; }
     if (acc.kind === 'cash') a.cash += b; else if (acc.kind === 'investment') a.brokerageCash += b; else a.bank += b;
   }

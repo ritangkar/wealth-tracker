@@ -8,6 +8,7 @@ import { spendingOf } from './ledger';
 import { addMonthsKey, monthOf, monthLabel, diffDays, type ISODate, type MonthKey } from './dates';
 import { formatMoney } from './money';
 import { wasteMonth } from './waste';
+import { monthlyEquivalent } from './expected';
 
 export type Tone = 'info' | 'positive' | 'note' | 'attention';
 export interface Insight {
@@ -90,7 +91,7 @@ export function generateInsights(db: Database, scope: ViewScope, today: ISODate)
   const review = db.expectedItems.filter((e) => e.kind === 'subscription' && e.status === 'active' && (scope === 'household' || e.ownerId === scope))
     .filter((e) => diffDays(today, e.lastUsed ?? e.startDate) > s.subscriptionReviewDays);
   if (review.length) {
-    const total = review.reduce((a, e) => a + e.amount, 0);
+    const total = review.reduce((a, e) => a + monthlyEquivalent(e), 0);
     out.push({ id: 'subs-check', tone: 'note', title: `${review.length} subscription${review.length > 1 ? 's' : ''} worth a quick check`,
       body: `${review.map((e) => e.name).join(', ')} (${formatMoney(total)}/month combined). You haven't marked ${review.length > 1 ? 'them' : 'it'} as used in a while — if you still enjoy ${review.length > 1 ? 'them' : 'it'}, tap “Still using” and it will stop showing.`,
       assumptions: [`Based on the “last used” date you set; flagged after ${s.subscriptionReviewDays} days.`], link: '#/subscriptions' });

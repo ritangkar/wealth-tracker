@@ -33,7 +33,7 @@ export function canIAfford(db: Database, scope: ViewScope, amount: Paise, today:
   for (const e of db.emis) {
     if (!inScope(e.ownerId, scope)) continue;
     const s = emiState(e); if (!s.active || !s.nextDueDate) continue;
-    for (let k = 0; k < s.monthsRemaining; k++) { if (addMonths(s.nextDueDate, k) <= to) cardDue += e.emiAmount; else break; }
+    for (let k = 0; k < s.monthsRemaining; k++) { if (addMonths(e.startDate, s.monthsCompleted + k) <= to) cardDue += e.emiAmount; else break; }
   }
   const committed = commitTotal + cardDue;
   const cashAfter = liquid - committed - amount;

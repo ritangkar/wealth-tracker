@@ -4,7 +4,7 @@
  */
 import type { Account, Database, Id, OwnerId, Transaction, TxnType } from './types';
 import type { Paise } from './money';
-import { isValidDate } from './dates';
+import { isValidDate, todayISO } from './dates';
 
 export interface Issue { field: string; message: string }
 
@@ -67,13 +67,20 @@ export function isCardPurchase(t: Transaction, accounts: Account[]): boolean {
 /** Which person "owns" the event for person-scoped views. */
 export const txnOwner = (t: Transaction): OwnerId => t.ownerId;
 
-export function accountBalances(db: Pick<Database, 'accounts' | 'transactions'>, asOf?: string): Map<Id, Paise> {
+/**
+ * Balance = opening balance (as at the START of openingDate) + effects of transactions dated on/after openingDate
+ * and on/before `asOf` (default: today, so future-dated entries don't change today's figures).
+ * Transactions dated before an account's openingDate are history only — they are already inside the opening balance.
+ */
+export function accountBalances(db: Pick<Database, 'accounts' | 'transactions'>, asOf: string = todayISO()): Map<Id, Paise> {
   const bal = new Map<Id, Paise>();
-  for (const a of db.accounts) bal.set(a.id, a.openingBalance);
+  const opening = new Map<Id, string>();
+  for (const a of db.accounts) { bal.set(a.id, a.openingBalance); opening.set(a.id, a.openingDate); }
   for (const t of db.transactions) {
-    if (asOf && t.date > asOf) continue;
+    if (t.date > asOf) continue;
     for (const e of accountEffects(t)) {
       if (!bal.has(e.accountId)) continue; // dangling ref handled by validation
+      if (t.date < opening.get(e.accountId)!) continue;
       bal.set(e.accountId, bal.get(e.accountId)! + e.delta);
     }
   }

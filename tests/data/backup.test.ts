@@ -94,7 +94,7 @@ describe('backup export/import', () => {
     expect(mergeDatabases(a2, a).db!.transactions).toHaveLength(0);
     // dangling reference after merge (txn in b references account deleted in a) → error not corruption
     const a3 = structuredClone(a); a3.accounts = []; a3.transactions = []; a3.tombstones.push({ key: `accounts:${a.accounts[0].id}`, collection: 'accounts', id: a.accounts[0].id, deletedAt: '2027-01-01T00:00:00.000Z' });
-    const dm = mergeDatabases(a3, a); expect(dm.db).toBeUndefined(); expect(dm.errors.join()).toMatch(/missing account/);
+    const dm = mergeDatabases(a3, a); expect(dm.db!.accounts).toHaveLength(1); expect(dm.notes.join()).toMatch(/Kept/); // parent kept, nothing lost
   });
 });
 

@@ -3,6 +3,8 @@ import { isValidDate, isValidMonth } from './dates';
 import { COLLECTIONS, type CollectionName, type Database } from './types';
 import { TXN_TYPES, validateTransaction } from './ledger';
 import { defaultSettings } from './seed';
+import { validateEmi } from './emi';
+import { validateWaste } from './waste';
 
 type Check = (v: unknown) => string | null;
 type Spec = Record<string, Check>;
@@ -43,7 +45,7 @@ export function checkObject(o: Record<string, unknown>, spec: Spec): string[] {
   return errs;
 }
 
-const cardDetails = obj({ creditLimit: int, statementDay: opt(int), dueDay: opt(int), last4: opt((v) => (typeof v === 'string' && /^\d{4}$/.test(v) ? null : 'must be exactly 4 digits')) });
+const cardDetails = obj({ creditLimit: int, statementDay: opt(int), dueDay: opt(int), emiInLedger: opt(bool), last4: opt((v) => (typeof v === 'string' && /^\d{4}$/.test(v) ? null : 'must be exactly 4 digits')) });
 
 export const SPECS: Record<CollectionName, Spec> = {
   categories: { ...stamped, name: nstr, kind: oneOf(['expense', 'income']), parentId: opt(str), system: opt(str) },
@@ -119,6 +121,25 @@ export function validateDatabase(input: unknown): ValidationResult & { db?: Data
   full.goalAllocations.forEach((a, i) => ref('goal', a.goalId, goals, `goalAllocations[${i}]`));
   full.categories.forEach((c, i) => ref('parent category', c.parentId, cats, `categories[${i}]`));
   full.expectedItems.forEach((e, i) => { ref('account', e.accountId, accounts, `expectedItems[${i}]`); ref('investment', e.investmentId, invs, `expectedItems[${i}]`); });
+  if (errors.length) return { errors, warnings };
+  // value rules the app's own forms enforce (imports must not bypass them)
+  const neg = (where: string, n: number | undefined, label: string, min = 0) => { if (n !== undefined && n < min) push(errors, `${where} ${label} must be ${min === 0 ? 'zero or more' : 'positive'}.`); };
+  if (full.settings) {
+    const ps = full.settings.people;
+    if (!(ps.length === 2 && ps[0].id === 'p1' && ps[1].id === 'p2')) push(errors, 'settings: exactly two people (p1 and p2) are required.');
+    for (const k of ['householdSavingsTarget', 'householdSavingsMinimum', 'transportReviewThreshold', 'spikeMinimum'] as const) neg('settings', full.settings[k], k);
+    ps.forEach((p) => neg('settings.people', p.savingsTarget, 'savingsTarget'));
+    if (full.settings.spikeFactor < 1) push(errors, 'settings: spikeFactor must be at least 1.');
+  }
+  full.accounts.forEach((a, i) => { if (a.kind === 'credit_card') { if (!a.card || !(a.card.creditLimit > 0)) push(errors, `accounts[${i}] credit card needs a credit limit.`); if (a.openingBalance > 0) push(errors, `accounts[${i}] card opening balance must not be positive.`); } });
+  full.cardReports.forEach((r, i) => (['creditLimit', 'availableLimit', 'outstanding', 'nonEmiOutstanding', 'emiOutstanding', 'emiBlocked'] as const).forEach((k) => neg(`cardReports[${i}]`, r[k], k)));
+  full.valuations.forEach((v, i) => { neg(`valuations[${i}]`, v.value, 'value'); neg(`valuations[${i}]`, v.invested, 'invested'); });
+  full.liabilities.forEach((l, i) => { neg(`liabilities[${i}]`, l.originalPrincipal, 'originalPrincipal'); neg(`liabilities[${i}]`, l.baselineOutstanding, 'baselineOutstanding'); neg(`liabilities[${i}]`, l.emi, 'emi'); if (l.interestRate < 0 || l.interestRate > 100) push(errors, `liabilities[${i}] interestRate must be 0–100.`); });
+  full.emis.forEach((e, i) => { for (const is of validateEmi(e)) push(errors, `emis[${i}] ${is.field}: ${is.message}`); });
+  full.expectedItems.forEach((e, i) => neg(`expectedItems[${i}]`, e.amount, 'amount', 1));
+  full.goals.forEach((g, i) => neg(`goals[${i}]`, g.targetAmount, 'targetAmount', 1));
+  full.goalAllocations.forEach((a, i) => { if (a.amount === 0) push(errors, `goalAllocations[${i}] amount must not be zero.`); });
+  full.wasteEntries.forEach((w, i) => { for (const is of validateWaste(w)) push(errors, `wasteEntries[${i}] ${is.field}: ${is.message}`); });
   if (errors.length) return { errors, warnings };
   // business rules (reported as errors: such data would corrupt balances)
   full.transactions.forEach((t, i) => {

@@ -90,19 +90,39 @@ export function previewRestore(current: Database, incoming: Database, mode: 'rep
   });
 }
 
-/** Union by id; newer updatedAt wins; tombstones newer than the record delete it. Returns validated result or errors. */
-export function mergeDatabases(current: Database, incoming: Database): { db?: Database; errors: string[] } {
+/**
+ * Union by id; newer updatedAt wins; tombstones newer than the record delete it.
+ * If a deleted parent (e.g. an account) is still referenced by surviving records from the other device, the parent is KEPT
+ * (and reported in `notes`) rather than failing the merge or dropping the user's records.
+ */
+export function mergeDatabases(current: Database, incoming: Database): { db?: Database; errors: string[]; notes: string[] } {
+  const notes: string[] = [];
   const tomb = new Map<string, Tombstone>();
   for (const t of [...current.tombstones, ...incoming.tombstones]) { const o = tomb.get(t.key); if (!o || o.deletedAt < t.deletedAt) tomb.set(t.key, t); }
   const out: any = { ...current, tombstones: [...tomb.values()] };
+  const all = (c: CollectionName) => new Map<string, any>([...(current[c] as any[]), ...(incoming[c] as any[])].reduce((m: Map<string, any>, x: any) => { const o = m.get(x.id); if (!o || o.updatedAt < x.updatedAt) m.set(x.id, x); return m; }, new Map<string, any>()));
   for (const c of COLLECTIONS as readonly CollectionName[]) {
-    const m = new Map<string, any>();
-    for (const x of [...(current[c] as any[]), ...(incoming[c] as any[])]) {
-      const o = m.get(x.id); if (!o || o.updatedAt < x.updatedAt) m.set(x.id, x);
-    }
-    out[c] = [...m.values()].filter((x) => { const t = tomb.get(`${c}:${x.id}`); return !t || t.deletedAt < x.updatedAt; });
+    out[c] = [...all(c).values()].filter((x) => { const t = tomb.get(`${c}:${x.id}`); return !t || t.deletedAt < x.updatedAt; });
   }
   out.settings = incoming.settings.updatedAt > current.settings.updatedAt ? incoming.settings : current.settings;
+  // keep parents that surviving children still need
+  const parents: { c: CollectionName; refs: (() => (string | undefined)[]) }[] = [
+    { c: 'accounts', refs: () => [...out.transactions.flatMap((t: any) => [t.fromAccountId, t.toAccountId]), ...out.emis.map((e: any) => e.cardAccountId), ...out.cardReports.map((r: any) => r.accountId)] },
+    { c: 'investments', refs: () => [...out.transactions.map((t: any) => t.investmentId), ...out.valuations.filter((v: any) => v.targetType === 'investment').map((v: any) => v.targetId)] },
+    { c: 'assets', refs: () => [...out.transactions.map((t: any) => t.assetId), ...out.valuations.filter((v: any) => v.targetType === 'asset').map((v: any) => v.targetId)] },
+    { c: 'liabilities', refs: () => out.transactions.map((t: any) => t.liabilityId) },
+    { c: 'goals', refs: () => out.goalAllocations.map((a: any) => a.goalId) },
+    { c: 'categories', refs: () => [...out.transactions.flatMap((t: any) => [t.categoryId, t.subcategoryId]), ...out.categories.map((c: any) => c.parentId)] },
+  ];
+  for (let pass = 0; pass < 3; pass++) {
+    for (const { c, refs } of parents) {
+      const have = new Set<string>((out[c] as any[]).map((x) => x.id));
+      const pool = all(c);
+      for (const id of new Set(refs())) {
+        if (id && !have.has(id) && pool.has(id)) { out[c].push(pool.get(id)); have.add(id); notes.push(`Kept “${pool.get(id).name ?? id}” (${c}) because newer records on the other device still use it.`); }
+      }
+    }
+  }
   const v = validateDatabase(out);
-  return v.errors.length ? { errors: v.errors } : { db: v.db, errors: [] };
+  return v.errors.length ? { errors: v.errors, notes } : { db: v.db, errors: [], notes };
 }

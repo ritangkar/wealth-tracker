@@ -44,7 +44,10 @@ async function networkFirstNavigation(request) {
     // no-cache = always revalidate with the server, so Pages' max-age never serves a stale shell after a deploy
     const res = await fetch(request.url, { cache: 'no-cache', signal: ctrl.signal });
     clearTimeout(t);
-    if (res.ok) { cache.put('./index.html', res.clone()); return res; }
+    // only the app shell (the start page) may replace the cached shell; a manifest/icon opened in a tab must not
+    const scopePath = new URL('./', self.location.href).pathname;
+    const p = new URL(request.url).pathname;
+    if (res.ok) { if (p === scopePath || p === scopePath + 'index.html') cache.put('./index.html', res.clone()); return res; }
   } catch (_) { /* offline or slow: fall through */ }
   return (await cache.match('./index.html')) || (await cache.match('./')) || new Response('Offline', { status: 503, statusText: 'Offline' });
 }

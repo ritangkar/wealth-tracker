@@ -1,6 +1,6 @@
 /** Expected/recurring items produce occurrences, never transactions (I9). */
 import type { Database, ExpectedItem, Id, Transaction, ViewScope } from './types';
-import { addDays, addMonths, type ISODate } from './dates';
+import { addDays, addMonths, makeDate, type ISODate } from './dates';
 import { inScope } from './scope';
 import { emiState } from './emi';
 import type { Paise } from './money';
@@ -34,7 +34,7 @@ export function likelyRecorded(item: ExpectedItem, date: ISODate, txns: Transact
   const month = date.slice(0, 7);
   const name = (item.merchant ?? item.name).trim().toLowerCase();
   return txns.some((t) => {
-    if (t.date.slice(0, 7) !== month || t.ownerId !== item.ownerId) return false;
+    if (t.date.slice(0, 7) !== month || t.ownerId !== item.ownerId || t.expectedItemId) return false; // linked ones are already accounted for
     if (item.kind === 'salary') return t.type === 'income' && (t.incomeType ?? 'Salary') === (item.incomeType ?? 'Salary');
     if (item.kind === 'sip') return t.type === 'investment_contribution' && t.investmentId === item.investmentId;
     const m = (t.merchant ?? '').trim().toLowerCase();
@@ -61,7 +61,7 @@ export function draftFromOccurrence(item: ExpectedItem, date: ISODate): Omit<Tra
   switch (item.kind) {
     case 'salary': return { ...base, type: 'income', toAccountId: item.accountId, incomeType: item.incomeType ?? 'Salary', merchant: undefined };
     case 'sip': return { ...base, type: 'investment_contribution', fromAccountId: item.accountId, investmentId: item.investmentId, paymentMethod: item.paymentMethod ?? 'bank_transfer' };
-    default: return { ...base, type: 'expense', fromAccountId: item.accountId, categoryId: item.categoryId, paymentMethod: item.paymentMethod };
+    default: return { ...base, type: 'expense', fromAccountId: item.accountId, categoryId: item.categoryId ?? (item.kind === 'subscription' ? 'cat_subscriptions' : item.kind === 'bill' ? 'cat_bills' : 'cat_other'), paymentMethod: item.paymentMethod };
   }
 }
 
@@ -84,7 +84,7 @@ export function upcomingCommitments(db: Database, scope: ViewScope, from: ISODat
     const s = emiState(e);
     if (!s.active || !s.nextDueDate) continue;
     for (let k = 0; k < s.monthsRemaining; k++) {
-      const d = addMonths(s.nextDueDate, k);
+      const d = addMonths(e.startDate, s.monthsCompleted + k);
       if (d > to) break;
       if (d >= from) out.push({ kind: 'emi', refId: e.id, name: e.name, date: d, amount: e.emiAmount, overdue: d < today });
     }
@@ -95,7 +95,7 @@ export function upcomingCommitments(db: Database, scope: ViewScope, from: ISODat
     const lo = [from, l.baselineDate, `${today.slice(0, 7)}-01`].sort().pop()!;
     let d = `${lo.slice(0, 7)}-01`;
     for (let k = 0; k < 24; k++, d = addMonths(d, 1)) {
-      const due = `${d.slice(0, 7)}-${String(Math.min(l.paymentDay, 28)).padStart(2, '0')}`;
+      const due = makeDate(+d.slice(0, 4), +d.slice(5, 7), l.paymentDay);
       if (due < lo || due > to) continue;
       if (l.endDate && due > l.endDate) continue;
       const paid = db.transactions.some((t) => t.type === 'liability_payment' && t.liabilityId === l.id && t.date.slice(0, 7) === due.slice(0, 7));
@@ -103,4 +103,14 @@ export function upcomingCommitments(db: Database, scope: ViewScope, from: ISODat
     }
   }
   return out.sort((a, b) => a.date.localeCompare(b.date));
+}
+
+/** Monthly equivalent of a recurring item's amount (weekly ×52/12, quarterly ÷3, yearly ÷12). */
+export function monthlyEquivalent(item: Pick<ExpectedItem, 'amount' | 'frequency'>): Paise {
+  switch (item.frequency) {
+    case 'weekly': return Math.round((item.amount * 52) / 12);
+    case 'quarterly': return Math.round(item.amount / 3);
+    case 'yearly': return Math.round(item.amount / 12);
+    default: return item.amount;
+  }
 }

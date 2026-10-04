@@ -58,6 +58,8 @@ export interface CardDetails {
   statementDay?: number; // 1-31
   dueDay?: number;
   last4?: string;        // optional, 4 digits only. Never full number.
+  /** true/undefined: tracked balance already includes remaining EMI principal. false: it excludes it (bank 'outstanding excl. EMI'). */
+  emiInLedger?: boolean;
   rewards?: RewardConfig;
 }
 /** User-maintained; NO defaults are shipped (rules change; unverifiable offline). */

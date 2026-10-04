@@ -11,12 +11,13 @@ async function boot() {
   const root = document.getElementById('app')!;
   try {
     const storage = new IdbStorage();
-    const store = await Store.open(storage, { appVersion: __APP_VERSION__ });
+    const store = await Store.open(storage, { appVersion: __APP_VERSION__, channel: 'wealth-os-sync' });
     void storage.persist();
     root.textContent = ''; // remove the static "Loading…" placeholder
     render(<App store={store} />, root);
     void registerSW();
-    (window as unknown as { __store?: Store }).__store = store; // handy for debugging / e2e; contains no secrets beyond what's on screen
+    // debug/e2e hook, only on localhost (never exposed on the deployed site)
+    if (location.hostname === 'localhost' || location.hostname === '127.0.0.1') (window as unknown as { __store?: Store }).__store = store;
   } catch (e) {
     root.innerHTML = '';
     const p = document.createElement('p'); p.style.cssText = 'font-family:system-ui;padding:2rem;max-width:36rem;margin:auto';

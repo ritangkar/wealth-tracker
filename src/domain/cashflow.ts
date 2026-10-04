@@ -72,7 +72,7 @@ export interface Projection {
   onTrack: boolean; monthNote?: string; assumptions: string[];
 }
 
-const isVariable = (t: Transaction) => spendingOf(t) !== 0 && !t.expectedItemId && !t.oneOff;
+const isVariable = (t: Transaction) => spendingOf(t) !== 0 && !t.expectedItemId && !t.oneOff && !t.recurring;
 
 export function projectMonthEnd(db: Database, scope: ViewScope, month: MonthKey, today: ISODate): Projection {
   const txns = scopedTxns(db, scope);

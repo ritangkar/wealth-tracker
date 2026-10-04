@@ -1,7 +1,7 @@
 /** Investments & assets: manual valuation snapshots + flows dated after the latest snapshot (I4). */
 import type { Database, Id, Transaction, Valuation } from './types';
 import type { Paise } from './money';
-import type { ISODate } from './dates';
+import { todayISO, type ISODate } from './dates';
 
 export interface HoldingValue { value: Paise; invested: Paise; asOf?: ISODate; lastValuationDate?: ISODate; gain: Paise; gainPct: number }
 
@@ -16,13 +16,13 @@ export function valuationsFor(db: Pick<Database, 'valuations'>, kind: 'investmen
   return db.valuations.filter((v) => v.targetType === kind && v.targetId === id).sort((a, b) => a.date.localeCompare(b.date) || a.createdAt.localeCompare(b.createdAt));
 }
 
-export function holdingValue(db: Pick<Database, 'valuations' | 'transactions'>, kind: 'investment' | 'asset', id: Id, asOf?: ISODate): HoldingValue {
-  const vals = valuationsFor(db, kind, id).filter((v) => !asOf || v.date <= asOf);
+export function holdingValue(db: Pick<Database, 'valuations' | 'transactions'>, kind: 'investment' | 'asset', id: Id, asOf: ISODate = todayISO()): HoldingValue {
+  const vals = valuationsFor(db, kind, id).filter((v) => v.date <= asOf);
   const base = vals[vals.length - 1];
   let value = base?.value ?? 0;
   let invested = base ? (base.invested ?? base.value) : 0;
   for (const t of flowsFor(kind, id, db.transactions)) {
-    if (asOf && t.date > asOf) continue;
+    if (t.date > asOf) continue;
     if (base && t.date <= base.date) continue; // already inside snapshot
     if (t.type === 'investment_redemption') {
       const costOut = value > 0 ? Math.round(invested * Math.min(1, t.amount / value)) : t.amount;

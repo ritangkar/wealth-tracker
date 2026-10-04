@@ -9,12 +9,14 @@ import { validateWaste } from '../domain/waste';
 import { buildEmi, confirmInstalment, undoLastInstalment, validateEmi, type NewEmiInput } from '../domain/emi';
 import { draftFromOccurrence } from '../domain/expected';
 import { buildSnapshot } from '../domain/networth';
+import { holdingValue } from '../domain/holdings';
 import { validateDatabase } from '../domain/schema';
 import { emptyDatabase } from '../domain/seed';
 import { todayISO, isValidDate, type ISODate } from '../domain/dates';
 import { newId } from './id';
 import { createBackup, mergeDatabases, serializeBackup, type BackupFile } from './backup';
 import { migrateData } from './migrations';
+import { repairDatabase } from './repair';
 import type { Op, Storage } from './storage';
 
 export type Result<T = void> = { ok: true; value: T } | { ok: false; issues: Issue[] };
@@ -24,7 +26,7 @@ const ok = <T,>(value: T): Result<T> => ({ ok: true, value });
 type Stamp = 'id' | 'createdAt' | 'updatedAt';
 export type Draft<T> = Omit<T, Stamp>;
 
-export interface StoreOptions { now?: () => Date; idGen?: (prefix: string) => string; appVersion?: string }
+export interface StoreOptions { now?: () => Date; idGen?: (prefix: string) => string; appVersion?: string; /** BroadcastChannel name for multi-tab refresh; omit to disable (tests). */ channel?: string }
 export type StoreStatus = 'ready' | 'recovery';
 
 class Tx {
@@ -52,7 +54,8 @@ export class Store {
   private queue: Promise<unknown> = Promise.resolve();
   private _db: Database;
   status: StoreStatus = 'ready';
-  recovery?: { errors: string[]; raw: string };
+  recovery?: { errors: string[]; raw: string; rawData?: unknown; storedVersion?: number };
+  private bc?: BroadcastChannel;
   persistError?: string;
   readonly appVersion: string;
   private clock: () => Date; private gen: (p: string) => string;
@@ -68,24 +71,52 @@ export class Store {
     if (!loaded) {
       const db = emptyDatabase(clock().toISOString());
       await storage.replaceAll(db, SCHEMA_VERSION);
-      return new Store(storage, db, opts);
+      const fresh = new Store(storage, db, opts); fresh.listen(opts.channel); return fresh;
     }
     let data: any = loaded.db;
     if (loaded.schemaVersion > SCHEMA_VERSION) {
       const s = new Store(storage, emptyDatabase(), opts); s.status = 'recovery';
-      s.recovery = { errors: [`Stored data is from a newer app version (schema ${loaded.schemaVersion}). Please update the app. Your data has not been changed.`], raw: JSON.stringify(loaded.db) };
+      s.recovery = { errors: [`Stored data is from a newer app version (schema ${loaded.schemaVersion}). Please update the app. Your data has not been changed.`], raw: envelope(loaded.db, loaded.schemaVersion), rawData: loaded.db, storedVersion: loaded.schemaVersion };
       return s;
     }
     try {
       if (loaded.schemaVersion < SCHEMA_VERSION) {
         data = migrateData(data, loaded.schemaVersion, SCHEMA_VERSION);
       }
-    } catch (e) { const s = new Store(storage, emptyDatabase(), opts); s.status = 'recovery'; s.recovery = { errors: [(e as Error).message], raw: JSON.stringify(loaded.db) }; return s; }
+    } catch (e) { const s = new Store(storage, emptyDatabase(), opts); s.status = 'recovery'; s.recovery = { errors: [(e as Error).message], raw: envelope(loaded.db, loaded.schemaVersion), rawData: loaded.db, storedVersion: loaded.schemaVersion }; return s; }
     const v = validateDatabase(data);
-    if (!v.db) { const s = new Store(storage, emptyDatabase(), opts); s.status = 'recovery'; s.recovery = { errors: v.errors, raw: JSON.stringify(loaded.db) }; return s; }
+    if (!v.db) { const s = new Store(storage, emptyDatabase(), opts); s.status = 'recovery'; s.recovery = { errors: v.errors, raw: envelope(loaded.db, loaded.schemaVersion), rawData: loaded.db, storedVersion: loaded.schemaVersion }; return s; }
     const store = new Store(storage, v.db, opts);
     if (loaded.schemaVersion < SCHEMA_VERSION) await storage.replaceAll(v.db, SCHEMA_VERSION);
+    store.listen(opts.channel);
     return store;
+  }
+
+  // ------------------------------------------------------------ multi-tab consistency
+  private listen(name?: string) {
+    if (!name || typeof BroadcastChannel === 'undefined') return;
+    this.bc = new BroadcastChannel(name);
+    this.bc.onmessage = () => { void this.enqueue(async () => { await this.reloadFromStorage(); }); };
+  }
+  /** Another tab changed storage: adopt its state (only if it validates; otherwise keep ours). */
+  private async reloadFromStorage() {
+    if (this.status !== 'ready') return;
+    const loaded = await this.storage.load(); if (!loaded || loaded.schemaVersion !== SCHEMA_VERSION) return;
+    const v = validateDatabase(loaded.db); if (!v.db) return;
+    this._db = v.db; this.emit();
+  }
+  private announce() { try { this.bc?.postMessage('changed'); } catch { /* ignore */ } }
+
+  /** From recovery mode: keep a safety copy of the raw data, remove only what cannot be valid, and open. */
+  async attemptRepair(): Promise<Result<{ dropped: string[] }>> {
+    if (this.status !== 'recovery' || !this.recovery?.rawData) return fail('Nothing to repair');
+    if ((this.recovery.storedVersion ?? SCHEMA_VERSION) !== SCHEMA_VERSION) return fail('This data is from a different app version and cannot be repaired here.');
+    const r = repairDatabase(this.recovery.rawData);
+    if (!r.db) return fail(`Automatic repair was not possible: ${r.errors[0] ?? 'unknown problem'}`);
+    try { await this.storage.addSafety('Before repair', this.recovery.raw); await this.storage.replaceAll(r.db, SCHEMA_VERSION); }
+    catch (e) { return fail(`Repair could not be saved, so nothing was changed: ${(e as Error).message}`); }
+    this._db = r.db; this.status = 'ready'; const dropped = r.dropped; this.recovery = undefined; this.emit(); this.announce();
+    return ok({ dropped });
   }
 
   get db(): Database { return this._db; }
@@ -105,7 +136,7 @@ export class Store {
       if (!r.ok) return r;
       const prev = this._db;
       this._db = tx.db; this.emit();
-      try { await this.storage.apply(tx.ops); this.persistError = undefined; }
+      try { await this.storage.apply(tx.ops); this.persistError = undefined; this.announce(); }
       catch (e) { this._db = prev; this.persistError = (e as Error).message; this.emit(); return fail(`Could not save: ${(e as Error).message}`); }
       return r;
     };
@@ -257,6 +288,11 @@ export class Store {
       if (!isValidDate(d.date)) return fail('Enter a valid date', 'date');
       if (!Number.isInteger(d.value) || d.value < 0) return fail('Enter a valid value', 'value');
       if (d.invested !== undefined && (!Number.isInteger(d.invested) || d.invested < 0)) return fail('Enter a valid invested amount', 'invested');
+      // no cost basis given: carry forward the cost basis the app computes at that date (keeps gain/loss meaningful)
+      if (d.targetType === 'investment' && d.invested === undefined) {
+        const h = holdingValue(tx.db, 'investment', d.targetId, d.date);
+        if (h.asOf !== undefined || h.invested > 0) d = { ...d, invested: h.invested };
+      }
       // one snapshot per item per day: replace
       const same = tx.db.valuations.find((v) => v.targetId === d.targetId && v.date === d.date);
       const v = same ? clean({ ...same, ...d, id: same.id, createdAt: same.createdAt, updatedAt: this.now() }) : this.stamp<Valuation>(clean(d), 'val', tx);
@@ -306,12 +342,20 @@ export class Store {
     });
   }
   /** Confirms an EMI instalment. Deliberately creates NO transaction. */
-  confirmEmiInstalment(id: Id, opts: { dueDate: ISODate; date: ISODate; amount?: number }) {
+  confirmEmiInstalment(id: Id, opts: { dueDate: ISODate; date: ISODate; amount?: number; recordInterestExpense?: boolean }) {
     return this.commit<Emi>((tx) => {
       const o = tx.db.emis.find((e) => e.id === id); if (!o) return fail('EMI not found');
-      const r = confirmInstalment(o, { ...opts, id: this.gen('pay'), now: this.now() });
+      const r = confirmInstalment(o, { dueDate: opts.dueDate, date: opts.date, amount: opts.amount, id: this.gen('pay'), now: this.now() });
       if (!r.emi) return fail(r.error!);
-      tx.put('emis', r.emi); return ok(r.emi);
+      tx.put('emis', r.emi);
+      // Optional, user-chosen: billed amount above the principal is interest/fees → a real expense on the card.
+      const pay = r.emi.payments[r.emi.payments.length - 1];
+      const extra = pay.amount - pay.principal;
+      if (opts.recordInterestExpense && extra > 0) {
+        const n = this.now();
+        tx.put('transactions', { id: this.gen('txn'), type: 'expense', date: opts.date, amount: extra, ownerId: o.ownerId, fromAccountId: o.cardAccountId, paymentMethod: 'credit_card', categoryId: 'cat_fees', merchant: o.name, notes: 'EMI interest / fees', createdAt: n, updatedAt: n });
+      }
+      return ok(r.emi);
     });
   }
   undoEmiInstalment(id: Id) {
@@ -340,6 +384,15 @@ export class Store {
       tx.put('transactions', t);
       tx.put('expectedItems', { ...item, confirmed: { ...item.confirmed, [date]: t.id }, skipped: item.skipped.filter((d) => d !== date), updatedAt: this.now() });
       return ok(t);
+    });
+  }
+  /** Mark an occurrence as satisfied by an EXISTING transaction (no new transaction is created). */
+  linkOccurrence(itemId: Id, date: ISODate, txnId: Id) {
+    return this.commit((tx) => {
+      const item = tx.db.expectedItems.find((e) => e.id === itemId); if (!item) return fail('Not found');
+      if (!tx.db.transactions.some((t) => t.id === txnId)) return fail('Transaction not found');
+      tx.put('expectedItems', { ...item, confirmed: { ...item.confirmed, [date]: txnId }, skipped: item.skipped.filter((d) => d !== date), updatedAt: this.now() });
+      return ok(undefined);
     });
   }
   skipOccurrence(itemId: Id, date: ISODate, skip = true) {
@@ -412,17 +465,17 @@ export class Store {
   async markBackedUp() { await this.updateSettings({ lastBackupAt: this.now() }); }
 
   /** Replace or merge. Always writes a safety snapshot of current data first; aborts if that fails. */
-  async restore(incoming: Database, mode: 'replace' | 'merge'): Promise<Result<{ safetyLabel: string }>> {
+  async restore(incoming: Database, mode: 'replace' | 'merge'): Promise<Result<{ safetyLabel: string; notes: string[] }>> {
     return this.enqueue(async () => {
-      let next = incoming;
-      if (mode === 'merge') { const m = mergeDatabases(this._db, incoming); if (!m.db) return { ok: false, issues: m.errors.map((e) => ({ field: '_', message: e })) } as Result<{ safetyLabel: string }>; next = m.db; }
-      const v = validateDatabase(next); if (!v.db) return { ok: false, issues: v.errors.map((e) => ({ field: '_', message: e })) } as Result<{ safetyLabel: string }>;
+      let next = incoming; let notes: string[] = [];
+      if (mode === 'merge') { const m = mergeDatabases(this._db, incoming); if (!m.db) return { ok: false, issues: m.errors.map((e) => ({ field: '_', message: e })) } as Result<{ safetyLabel: string; notes: string[] }>; next = m.db; notes = m.notes; }
+      const v = validateDatabase(next); if (!v.db) return { ok: false, issues: v.errors.map((e) => ({ field: '_', message: e })) } as Result<{ safetyLabel: string; notes: string[] }>;
       const label = `Before ${mode} on ${this.now()}`;
       try { await this.storage.addSafety(label, (await this.exportBackup()).json); }
       catch (e) { return fail(`Could not create a safety copy of your current data, so nothing was changed: ${(e as Error).message}`); }
       const prev = this._db;
       try { await this.storage.replaceAll(v.db, SCHEMA_VERSION); } catch (e) { this._db = prev; return fail(`Restore failed and your data was kept: ${(e as Error).message}`); }
-      this._db = v.db; this.emit(); return ok({ safetyLabel: label });
+      this._db = v.db; this.emit(); this.announce(); return ok({ safetyLabel: label, notes });
     });
   }
   /** Erase everything (after a safety snapshot). */
@@ -430,6 +483,10 @@ export class Store {
     const r = await this.restore(emptyDatabase(this.now()), 'replace'); return r.ok ? ok(undefined) : r;
   }
   private enqueue<T>(fn: () => Promise<T>): Promise<T> { const p = this.queue.then(fn, fn); this.queue = p.catch(() => undefined); return p; }
+}
+
+function envelope(data: unknown, schemaVersion: number): string {
+  return JSON.stringify({ app: 'wealth-os', schemaVersion, appVersion: 'recovery-export', exportedAt: new Date().toISOString(), data }, null, 2);
 }
 
 /** Drop undefined/empty-string optional fields so stored JSON stays tidy. */

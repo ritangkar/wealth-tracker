@@ -38,7 +38,9 @@ export function cardMetrics(db: Database, card: Account, today: ISODate): CardMe
   const emis = db.emis.filter((e) => e.cardAccountId === card.id).map(emiState).filter((s) => s.active);
   const emiOutstanding = emis.reduce((s, e) => s + e.outstanding, 0);
   const blocked = emis.reduce((s, e) => s + e.blocked, 0);
-  const nonEmi = Math.max(0, ledgerOutstanding - emiOutstanding);
+  const inLedger = card.card?.emiInLedger !== false;
+  const nonEmi = inLedger ? Math.max(0, ledgerOutstanding - emiOutstanding) : ledgerOutstanding;
+  const totalEstimate = inLedger ? ledgerOutstanding : ledgerOutstanding + emiOutstanding;
   const rep = latestReport(db, card.id);
   const limit = rep?.creditLimit ?? card.card?.creditLimit ?? 0;
 
@@ -51,18 +53,18 @@ export function cardMetrics(db: Database, card: Account, today: ISODate): CardMe
     if (t.date <= rep.date) continue;
     for (const e of accountEffects(t)) if (e.accountId === card.id) { spendSince += -e.delta; later++; }
   }
-  const outstanding = rep?.outstanding !== undefined ? Math.max(0, rep.outstanding + spendSince) : ledgerOutstanding;
+  const outstanding = rep?.outstanding !== undefined ? Math.max(0, rep.outstanding + spendSince) + (inLedger ? 0 : (rep.emiOutstanding ?? emiOutstanding)) : totalEstimate;
   const available = rep?.availableLimit !== undefined ? Math.min(limit, Math.max(0, rep.availableLimit - spendSince)) : estAvailable;
   const used = rep?.availableLimit !== undefined ? Math.max(0, limit - available) : estUsed;
   const emiOut = rep?.emiOutstanding ?? emiOutstanding;
   const blockedOut = rep?.emiBlocked ?? blocked;
-  const nonEmiOut = rep?.nonEmiOutstanding !== undefined ? Math.max(0, rep.nonEmiOutstanding + spendSince) : rep?.outstanding !== undefined ? Math.max(0, outstanding - emiOut) : nonEmi;
+  const nonEmiOut = rep?.nonEmiOutstanding !== undefined ? Math.max(0, rep.nonEmiOutstanding + spendSince) : rep?.outstanding !== undefined ? (inLedger ? Math.max(0, outstanding - emiOut) : Math.max(0, rep.outstanding + spendSince)) : nonEmi;
   return {
     accountId: card.id, name: card.name, creditLimit: limit, available, availableSource: rep?.availableLimit !== undefined ? 'bank' : 'estimate',
     used, outstanding, outstandingSource: rep?.outstanding !== undefined ? 'bank' : 'estimate',
     nonEmiOutstanding: nonEmiOut, emiOutstanding: emiOut, emiBlocked: blockedOut,
-    utilizationPct: limit > 0 ? (used / limit) * 100 : 0, overLimit: limit > 0 && estUsed > limit,
-    estimate: { available: estAvailable, used: estUsed, outstanding: ledgerOutstanding },
+    utilizationPct: limit > 0 ? (used / limit) * 100 : 0, overLimit: limit > 0 && (rep?.availableLimit !== undefined ? rep.availableLimit - spendSince < 0 : estUsed > limit),
+    estimate: { available: estAvailable, used: estUsed, outstanding: totalEstimate },
     reportDate: rep?.date, laterActivityCount: later,
     nextStatementDate: nextDayOccurrence(card.card?.statementDay, today), nextDueDate: nextDayOccurrence(card.card?.dueDay, today),
     activeEmiCount: emis.length, ledgerCredit: Math.max(0, bal),
