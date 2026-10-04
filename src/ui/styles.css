@@ -160,3 +160,12 @@ textarea { resize: vertical; }
 html, body { max-width: 100%; overflow-x: hidden; }
 .topbar { gap: .5rem; flex-wrap: nowrap; } .brand { white-space: nowrap; }
 img, svg { max-width: 100%; }
+
+/* ---- goal allocation lines */
+.alloc-lines { display: flex; flex-direction: column; gap: .9rem; }
+.alloc-line { display: flex; flex-direction: column; gap: .6rem; padding: .85rem; border: 1px solid var(--c-border); border-radius: 14px; background: var(--c-surface-2); }
+.alloc-line .btn { align-self: flex-end; }
+.alloc-foot { display: flex; justify-content: space-between; align-items: center; gap: .75rem; flex-wrap: wrap; }
+.alloc-total { font-size: 1rem; }
+.src-row { display: grid; grid-template-columns: 1fr auto; gap: .15rem .75rem; padding: .55rem 0; border-bottom: 1px solid var(--c-border); }
+.src-row:last-child { border-bottom: 0; } .src-row .row-sub { grid-column: 1 / -1; }

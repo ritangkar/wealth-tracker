@@ -107,9 +107,9 @@ export function mergeDatabases(current: Database, incoming: Database): { db?: Da
   out.settings = incoming.settings.updatedAt > current.settings.updatedAt ? incoming.settings : current.settings;
   // keep parents that surviving children still need
   const parents: { c: CollectionName; refs: (() => (string | undefined)[]) }[] = [
-    { c: 'accounts', refs: () => [...out.transactions.flatMap((t: any) => [t.fromAccountId, t.toAccountId]), ...out.emis.map((e: any) => e.cardAccountId), ...out.cardReports.map((r: any) => r.accountId)] },
-    { c: 'investments', refs: () => [...out.transactions.map((t: any) => t.investmentId), ...out.valuations.filter((v: any) => v.targetType === 'investment').map((v: any) => v.targetId)] },
-    { c: 'assets', refs: () => [...out.transactions.map((t: any) => t.assetId), ...out.valuations.filter((v: any) => v.targetType === 'asset').map((v: any) => v.targetId)] },
+    { c: 'accounts', refs: () => [...out.transactions.flatMap((t: any) => [t.fromAccountId, t.toAccountId]), ...out.emis.map((e: any) => e.cardAccountId), ...out.cardReports.map((r: any) => r.accountId), ...out.goalAllocations.map((a: any) => (a.sourceKind === 'account' ? a.sourceId : undefined))] },
+    { c: 'investments', refs: () => [...out.transactions.map((t: any) => t.investmentId), ...out.goalAllocations.map((a: any) => (a.sourceKind === 'investment' ? a.sourceId : undefined)), ...out.valuations.filter((v: any) => v.targetType === 'investment').map((v: any) => v.targetId)] },
+    { c: 'assets', refs: () => [...out.transactions.map((t: any) => t.assetId), ...out.goalAllocations.map((a: any) => (a.sourceKind === 'asset' ? a.sourceId : undefined)), ...out.valuations.filter((v: any) => v.targetType === 'asset').map((v: any) => v.targetId)] },
     { c: 'liabilities', refs: () => out.transactions.map((t: any) => t.liabilityId) },
     { c: 'goals', refs: () => out.goalAllocations.map((a: any) => a.goalId) },
     { c: 'categories', refs: () => [...out.transactions.flatMap((t: any) => [t.categoryId, t.subcategoryId]), ...out.categories.map((c: any) => c.parentId)] },

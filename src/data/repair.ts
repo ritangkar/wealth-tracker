@@ -48,6 +48,7 @@ export function repairDatabase(raw: any): RepairResult {
     d.cardReports = d.cardReports.filter((r: any) => (ok(accounts, r.accountId) ? true : (note('cardReports', r.id, 'card missing'), false)));
     d.valuations = d.valuations.filter((v: any) => (ok(v.targetType === 'investment' ? invs : assets, v.targetId) ? true : (note('valuations', v.id, 'item missing'), false)));
     d.goalAllocations = d.goalAllocations.filter((a: any) => (ok(goals, a.goalId) ? true : (note('goalAllocations', a.id, 'goal missing'), false)));
+    for (const a of d.goalAllocations) { if (a.sourceKind && !(a.sourceKind === 'account' ? accounts : a.sourceKind === 'investment' ? invs : assets).has(a.sourceId)) { delete a.sourceKind; delete a.sourceId; } }
     for (const e of d.expectedItems) { if (e.accountId && !accounts.has(e.accountId)) delete e.accountId; if (e.investmentId && !invs.has(e.investmentId)) delete e.investmentId; }
     if (before === JSON.stringify([d.transactions.length, d.emis.length, d.cardReports.length, d.valuations.length, d.goalAllocations.length])) break;
   }

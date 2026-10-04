@@ -28,7 +28,7 @@ See `docs/FINANCIAL_RULES.md` for full detail. Headlines:
 2. Δ net worth from transactions alone = income − spending (+ adjustments). Property-tested with random ledgers.
 3. Card purchase = expense on a credit-card account (raises outstanding). Card settlement moves money bank→card; not an expense.
 4. EMI instalments never create transactions/expenses; reduced available credit is never an expense. EMI blocked credit is an *estimate*; bank-reported values override.
-5. Goal allocations are conceptual envelopes: never change balances or net worth.
+5. Goal allocations are conceptual envelopes: never change balances or net worth. Each names a source (account / non-EPF investment / gold); several sources per goal allowed.
 6. Waste entries are not expenses (money already spent) — they never alter spending/net worth.
 7. Expected/recurring items never fabricate transactions; user confirms.
 8. Restore never silently destroys data: validate → preview → auto safety-snapshot → apply.

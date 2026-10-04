@@ -2,7 +2,8 @@ import { useState } from 'preact/hooks';
 import { Badge, Banner, Button, Card, DateField, EmptyState, FormErrors, MoneyField, Progress, Segmented, SelectField, Sheet, Stat, TextArea, TextField, fieldError, useConfirm } from '../../kit';
 import { toast, useAction, useDb, useScope, useStore, ownerOptions, personName, defaultOwner } from '../../state';
 import { formatDate, formatMoney } from '../../format';
-import { goalProgress, goalsInScope, unallocatedLiquid } from '../../../domain/goals';
+import { fundingOverview, goalProgress, goalSourceBreakdown, goalsInScope } from '../../../domain/goals';
+import { AllocationLines, initialLines, linesToDrafts, linesTotal, type AllocLine } from '../../quickadd/AllocationLines';
 import type { Goal, GoalKind, OwnerId } from '../../../domain/types';
 import './plan.css';
 
@@ -17,7 +18,7 @@ export default function Goals() {
   const db = useDb(); const store = useStore(); const [scope] = useScope();
   const today = store.today();
   const goals = goalsInScope(db, scope);
-  const money = unallocatedLiquid(db, scope);
+  const ov = fundingOverview(db, scope);
   const [edit, setEdit] = useState<Goal | 'new' | null>(null);
   const [alloc, setAlloc] = useState<{ goal: Goal; release: boolean } | null>(null);
   const [hist, setHist] = useState<string | null>(null);
@@ -39,13 +40,27 @@ export default function Goals() {
       Allocating {formatMoney(6000000)} to a goal is like labelling an envelope — it doesn’t change your bank balances or net worth. It just reminds you what that cash is for.
     </div>
 
-    <Card title="Cash and envelopes" action={<Button variant="primary" size="sm" onClick={() => setEdit('new')}>+ New goal</Button>}>
+    <Card title="Money set aside for goals" action={<Button variant="primary" size="sm" onClick={() => setEdit('new')}>+ New goal</Button>}>
       <div class="px-stats">
-        <Stat label="Liquid cash" value={formatMoney(money.liquid)} sub="bank, cash, wallets" />
-        <Stat label="Set aside for goals" value={formatMoney(money.allocated)} />
-        <Stat label="Not yet set aside" value={formatMoney(money.unallocated)} tone={money.unallocated < 0 ? 'warn' : 'good'} />
+        <Stat label="Available to set aside" value={formatMoney(ov.totalAvailable)} sub="cash, FDs, RDs, funds, stocks, gold — not EPF/PPF" />
+        <Stat label="Set aside for goals" value={formatMoney(ov.totalAllocated)} />
+        <Stat label="Still free" value={formatMoney(ov.totalFree)} tone={ov.totalFree < 0 ? 'warn' : 'good'} />
       </div>
-      {money.unallocated < 0 && <Banner tone="warn">Your goals hold {formatMoney(-money.unallocated)} more than your current liquid cash. That is fine as a plan, but you may want to top up savings or release some allocation.</Banner>}
+      {ov.totalFree < 0 && <Banner tone="warn">Your goals hold {formatMoney(-ov.totalFree)} more than the money currently available. That is fine as a plan (valuations move), but you may want to top up or release some allocation.</Banner>}
+      {ov.sources.some((s) => s.allocated !== 0 || s.value > 0) && (
+        <details class="disclosure"><summary>Where your money is set aside</summary>
+          <div class="disclosure-body">
+            {ov.sources.filter((s) => s.value > 0 || s.allocated !== 0).sort((a, b) => b.allocated - a.allocated || b.value - a.value).map((s) => (
+              <div class="src-row" key={`${s.kind}:${s.id}`}>
+                <div class="row-title">{s.name} <span class="muted">· {s.label}</span></div>
+                <div class="row-amt">{formatMoney(s.value)}</div>
+                <div class="row-sub">Set aside {formatMoney(s.allocated)} · <span class={s.free < 0 ? 'neg-warn' : ''}>free {formatMoney(s.free)}</span></div>
+              </div>
+            ))}
+            {ov.unassigned !== 0 && <div class="src-row"><div class="row-title">Not tied to a source <span class="muted">· older entries</span></div><div class="row-amt">{formatMoney(ov.unassigned)}</div><div class="row-sub">counted against cash</div></div>}
+          </div>
+        </details>
+      )}
     </Card>
 
     {!goals.length && <Card><EmptyState title="No goals yet" body="Pick anything that matters — an emergency fund, a trip, a down payment. You choose the target and the timeline." action={<Button variant="primary" onClick={() => setEdit('new')}>Add a goal</Button>} /></Card>}
@@ -71,6 +86,10 @@ export default function Goals() {
             <Stat label="Set aside" value={formatMoney(p.allocated)} sub={`of ${formatMoney(p.target)}`} />
             <Stat label="Still to go" value={formatMoney(p.remaining)} sub={g.targetDate ? `by ${formatDate(g.targetDate)}` : 'no date set'} />
           </div>
+          {(() => { const bd = goalSourceBreakdown(db, g.id); return bd.length ? (
+            <div class="px-sub" aria-label={`Where ${g.name} is set aside from`}>
+              <b>Set aside from:</b> {bd.map((r) => `${r.name} ${formatMoney(r.amount)}`).join(' · ')}
+            </div>) : null; })()}
           {behind && p.remaining > 0 && <div class="px-sub">{p.monthsLeft === 0 ? 'The target month is here — ' : `${p.monthsLeft} month${p.monthsLeft === 1 ? '' : 's'} left — `}about {formatMoney(p.requiredMonthly ?? 0)} a month would get you there. A guide, not a deadline to stress about.</div>}
           <div class="px-actions">
             <Button size="sm" variant="primary" onClick={() => setAlloc({ goal: g, release: false })}>Allocate</Button>
@@ -129,22 +148,27 @@ function AllocSheet({ goal, release, onClose }: { goal: Goal; release: boolean; 
   const db = useDb(); const store = useStore(); const { busy } = useAction();
   const today = store.today();
   const [mode, setMode] = useState<'add' | 'release'>(release ? 'release' : 'add');
-  const [amt, setAmt] = useState<number | undefined>();
+  const [lines, setLines] = useState<AllocLine[]>(() => initialLines(db, release ? 'release' : 'add', goal.id));
   const [date, setDate] = useState(today); const [notes, setNotes] = useState('');
   const [issues, setIssues] = useState<{ field: string; message: string }[]>([]);
   const p = goalProgress(db, goal, today);
+  const total = linesTotal(lines);
+  const changeMode = (m: 'add' | 'release') => { setMode(m); setLines(initialLines(db, m, goal.id)); setIssues([]); };
   const save = async () => {
-    if (!amt || amt <= 0) { setIssues([{ field: 'amount', message: 'Enter an amount' }]); return; }
-    const r = await store.addAllocation({ goalId: goal.id, date, amount: mode === 'add' ? amt : -amt, ownerId: goal.ownerId, notes: notes.trim() || undefined });
-    if (r.ok) { toast(mode === 'add' ? 'Set aside' : 'Released'); onClose(); } else setIssues(r.issues);
+    const built = linesToDrafts(lines, { goalId: goal.id, date, ownerId: goal.ownerId, notes: notes.trim() || undefined, sign: mode === 'add' ? 1 : -1 });
+    if (!built.drafts) { setIssues([{ field: 'amount', message: built.error! }]); return; }
+    const r = await store.addAllocations(built.drafts);
+    if (r.ok) { toast(mode === 'add' ? `Set aside ${formatMoney(total)}` : `Released ${formatMoney(total)}`); onClose(); } else setIssues(r.issues);
   };
   return (
-    <Sheet title={`${goal.name}`} onClose={onClose} footer={<><Button variant="ghost" onClick={onClose}>Cancel</Button><Button variant="primary" disabled={busy} onClick={save}>{mode === 'add' ? 'Set aside' : 'Release'}</Button></>}>
+    <Sheet title={`${goal.name}`} onClose={onClose} footer={<><Button variant="ghost" onClick={onClose}>Cancel</Button><Button variant="primary" disabled={busy} onClick={save}>{mode === 'add' ? `Set aside${total ? ' ' + formatMoney(total) : ''}` : 'Release'}</Button></>}>
       <div class="px-form">
-        <Segmented label="Allocate or release" value={mode} onChange={setMode} options={[{ value: 'add', label: 'Allocate' }, { value: 'release', label: 'Release' }]} />
-        <div class="px-explain">This only moves a label. Your bank balances and net worth stay exactly the same. Currently set aside: {formatMoney(p.allocated)}.</div>
+        <Segmented label="Allocate or release" value={mode} onChange={changeMode} options={[{ value: 'add', label: 'Allocate' }, { value: 'release', label: 'Release' }]} />
+        <div class="px-explain">Choose which money this comes from — you can combine several, e.g. ₹30,000 from an FD and ₹20,000 from a mutual fund. Nothing is moved or sold; your balances and net worth stay exactly the same. Currently set aside for this goal: {formatMoney(p.allocated)}.</div>
         <FormErrors issues={issues} />
-        <MoneyField label={mode === 'add' ? 'Amount to set aside' : 'Amount to release'} value={amt} onChange={setAmt} error={fieldError(issues, 'amount')} autoFocus big />
+        <AllocationLines db={db} mode={mode} goalId={goal.id} lines={lines} setLines={setLines} />
+        {fieldError(issues, 'amount') && <p class="err" role="alert">{fieldError(issues, 'amount')}</p>}
+        {fieldError(issues, 'source') && <p class="err" role="alert">{fieldError(issues, 'source')}</p>}
         <DateField label="Date" value={date} onChange={setDate} />
         <TextField label="Note (optional)" value={notes} onInput={setNotes} />
       </div>
@@ -162,7 +186,7 @@ function HistorySheet({ goalId, onClose }: { goalId: string; onClose: () => void
         <ul class="px-list px-hist">
           {items.map((a) => (
             <li key={a.id}>
-              <span><b class={a.amount > 0 ? 'pos' : ''}>{a.amount > 0 ? '+' : '−'}{formatMoney(Math.abs(a.amount))}</b><div class="px-sub">{formatDate(a.date)}{a.notes ? ` · ${a.notes}` : ''}</div></span>
+              <span><b class={a.amount > 0 ? 'pos' : ''}>{a.amount > 0 ? '+' : '−'}{formatMoney(Math.abs(a.amount))}</b><div class="px-sub">{formatDate(a.date)} · {srcName(db, a)}{a.notes ? ` · ${a.notes}` : ''}</div></span>
               <Button size="sm" variant="ghost" aria-label={`Delete allocation of ${formatMoney(Math.abs(a.amount))} on ${formatDate(a.date)}`}
                 onClick={async () => { if (await ask({ title: 'Delete this entry?', danger: true, confirmLabel: 'Delete', body: <p>Removes this allocation record. Bank balances are unaffected.</p> })) await run(() => store.deleteAllocation(a.id), 'Entry deleted'); }}>Delete</Button>
             </li>
@@ -172,4 +196,9 @@ function HistorySheet({ goalId, onClose }: { goalId: string; onClose: () => void
       {dialog}
     </Sheet>
   );
+}
+
+function srcName(db: ReturnType<typeof useDb>, a: { sourceKind?: 'account' | 'investment' | 'asset'; sourceId?: string }) {
+  if (!a.sourceKind) return 'not tied to a source';
+  return (a.sourceKind === 'account' ? db.accounts : a.sourceKind === 'investment' ? db.investments : db.assets).find((x) => x.id === a.sourceId)?.name ?? 'removed item';
 }

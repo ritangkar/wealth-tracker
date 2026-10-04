@@ -59,7 +59,7 @@ export const SPECS: Record<CollectionName, Spec> = {
   emis: { ...stamped, name: nstr, cardAccountId: nstr, ownerId: OWNER, originalAmount: int, emiAmount: int, tenure: posInt, startDate: date, paymentDay: opt(int), monthsCompletedAtEntry: int, outstandingAtEntry: int, payments: arrOf((p) => (obj({ id: nstr, date, dueDate: date, principal: int, amount: int })(p))), blockPolicy: oneOf(['as_paid', 'on_completion']), blockedOverride: opt(int), purchaseTxnId: opt(str), status: oneOf(['active', 'completed', 'stopped']), notes: opt(str) },
   expectedItems: { ...stamped, kind: oneOf(['subscription', 'sip', 'salary', 'bill', 'other']), name: nstr, amount: int, frequency: oneOf(['weekly', 'monthly', 'quarterly', 'yearly']), startDate: date, endDate: opt(date), ownerId: OWNER, accountId: opt(str), paymentMethod: opt(PAY), categoryId: opt(str), merchant: opt(str), investmentId: opt(str), incomeType: opt(str), skipped: arrOf(date), confirmed: recordOf(str), lastUsed: opt(date), status: oneOf(['active', 'stopped']), notes: opt(str) },
   goals: { ...stamped, name: nstr, kind: oneOf(['emergency', 'trip', 'land', 'purchase', 'vehicle', 'home', 'wealth', 'other']), ownerId: OWNER, targetAmount: int, targetDate: opt(date), location: opt(str), description: opt(str), status: oneOf(['active', 'achieved', 'paused']) },
-  goalAllocations: { ...stamped, goalId: nstr, date, amount: int, ownerId: OWNER, notes: opt(str) },
+  goalAllocations: { ...stamped, goalId: nstr, date, amount: int, ownerId: OWNER, notes: opt(str), sourceKind: opt(oneOf(['account', 'investment', 'asset'])), sourceId: opt(str) },
   wasteEntries: { ...stamped, date, item: nstr, quantity: opt(str), cost: int, category: oneOf(['food', 'groceries', 'product', 'unused', 'spoiled', 'other']), reason: opt(str), ownerId: OWNER, notes: opt(str), txnId: opt(str) },
   snapshots: { ...stamped, date, byOwner: obj({ p1: obj({ assets: int, liabilities: int }), p2: obj({ assets: int, liabilities: int }), hh: obj({ assets: int, liabilities: int }) }) },
 };
@@ -118,7 +118,11 @@ export function validateDatabase(input: unknown): ValidationResult & { db?: Data
   full.cardReports.forEach((r, i) => ref('account', r.accountId, accounts, `cardReports[${i}]`));
   full.emis.forEach((e, i) => ref('account', e.cardAccountId, accounts, `emis[${i}]`));
   full.valuations.forEach((v, i) => ref(v.targetType, v.targetId, v.targetType === 'investment' ? invs : assets, `valuations[${i}]`));
-  full.goalAllocations.forEach((a, i) => ref('goal', a.goalId, goals, `goalAllocations[${i}]`));
+  full.goalAllocations.forEach((a, i) => {
+    ref('goal', a.goalId, goals, `goalAllocations[${i}]`);
+    if (!!a.sourceKind !== !!a.sourceId) push(errors, `goalAllocations[${i}] needs both sourceKind and sourceId, or neither.`);
+    if (a.sourceKind) ref(a.sourceKind, a.sourceId, a.sourceKind === 'account' ? accounts : a.sourceKind === 'investment' ? invs : assets, `goalAllocations[${i}] source`);
+  });
   full.categories.forEach((c, i) => ref('parent category', c.parentId, cats, `categories[${i}]`));
   full.expectedItems.forEach((e, i) => { ref('account', e.accountId, accounts, `expectedItems[${i}]`); ref('investment', e.investmentId, invs, `expectedItems[${i}]`); });
   if (errors.length) return { errors, warnings };

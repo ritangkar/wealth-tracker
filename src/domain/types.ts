@@ -200,7 +200,12 @@ export interface Goal extends Stamped {
   status: 'active' | 'achieved' | 'paused';
 }
 /** Conceptual envelope movement. NEVER touches balances. Signed (negative = release). */
-export interface GoalAllocation extends Stamped { goalId: Id; date: ISODate; amount: Paise; ownerId: OwnerId; notes?: string }
+export type AllocationSourceKind = 'account' | 'investment' | 'asset';
+export interface GoalAllocation extends Stamped {
+  goalId: Id; date: ISODate; amount: Paise; ownerId: OwnerId; notes?: string;
+  /** Which money this is set aside from (bank/cash account, investment other than EPF/PPF, or gold). Absent on older entries = "not tied to a source" (counted against cash). */
+  sourceKind?: AllocationSourceKind; sourceId?: Id;
+}
 
 // ---------- waste
 export type WasteCategory = 'food' | 'groceries' | 'product' | 'unused' | 'spoiled' | 'other';

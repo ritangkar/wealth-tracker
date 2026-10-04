@@ -419,10 +419,25 @@ export class Store {
       tx.put('goalAllocations', a); return ok(a);
     });
   }
+  /** Several allocation lines at once (e.g. ₹30k from an FD + ₹20k from a fund). All-or-nothing. */
+  addAllocations(drafts: Draft<GoalAllocation>[]) {
+    return this.commit<GoalAllocation[]>((tx) => {
+      if (!drafts.length) return fail('Add at least one amount');
+      const out: GoalAllocation[] = [];
+      for (const [i, d] of drafts.entries()) {
+        const a = this.stamp<GoalAllocation>(clean(d), 'alloc', tx);
+        const issues = validateAllocation(a, tx.db);
+        if (issues.length) return { ok: false, issues: issues.map((x) => ({ field: x.field, message: drafts.length > 1 ? `Line ${i + 1}: ${x.message}` : x.message })) };
+        tx.put('goalAllocations', a); out.push(a);
+      }
+      return ok(out);
+    });
+  }
   deleteAllocation(id: Id) {
     return this.commit((tx) => {
       const a = tx.db.goalAllocations.find((x) => x.id === id); if (!a) return fail('Not found');
       if (a.amount > 0 && tx.db.goalAllocations.filter((x) => x.goalId === a.goalId && x.id !== id).reduce((s, x) => s + x.amount, 0) < 0) return fail('Removing this would leave the goal negative');
+      if (a.amount > 0 && a.sourceKind && tx.db.goalAllocations.filter((x) => x.goalId === a.goalId && x.sourceKind === a.sourceKind && x.sourceId === a.sourceId && x.id !== id).reduce((s, x) => s + x.amount, 0) < 0) return fail('Removing this would leave this source negative for the goal');
       tx.del('goalAllocations', id); return ok(undefined);
     });
   }

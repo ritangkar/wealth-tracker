@@ -7,9 +7,10 @@ _Last updated: end of build session 1 (after independent audit + remediation)._
 - **Data**: IndexedDB storage + store with validated commands, rollback, tombstones; versioned JSON backup, strict validation (structure, references, financial rules), checksum, migrations framework, merge + replace restore with automatic safety snapshots, recovery mode; CSV export.
 - **UI**: Home dashboard, Activity, quick-add (expense/income/transfer/invest+valuation/loan+EMI instalment/waste/goal), Wealth (overview/accounts/investments/assets), Debt (cards/EMIs/loans), Plan (savings/goals/upcoming/afford), Subscriptions, Waste, Insights (nudges/spending/trends), Settings (backup/restore, people & targets, categories, income types, lock, theme, storage, demo/reset), Welcome onboarding.
 - **PWA**: relative paths, hash routing, generated service worker (precache, versioned caches, waiting-worker update prompt, navigation revalidation), manifest + maskable icons, offline, 404 redirect, CI deploy workflow.
-- **Tests**: 117 unit/data tests (incl. audit regression suite), 26 Playwright tests (desktop + Pixel 7) run against a Pages-style `/wealth-tracker/` subpath.
+- **Tests**: 126 unit/data tests (incl. audit regression and goal-source suites), 28 Playwright tests (desktop + Pixel 7) run against a Pages-style `/wealth-tracker/` subpath.
 
 ## Recent changes
+- Goal allocations can be set aside from specific sources (cash/bank, FDs, RDs, mutual funds, stocks, gold; EPF/PPF excluded) and split across several sources in one go; per-source free amounts and per-goal breakdown are shown. Optional fields on `GoalAllocation` (no schema bump).
 - One household view (person switcher removed); install banner + Settings install card; mobile top-bar overflow fixed; projections rounded to rupees; 26 e2e tests (desktop + mobile).
 
 ## Known limitations / not done

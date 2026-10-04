@@ -75,7 +75,11 @@ export function sampleDatabase(today: ISODate, now = new Date().toISOString()): 
   const g2 = { id: id('goal'), name: 'Next Trip', kind: 'trip' as const, ownerId: 'hh' as const, targetAmount: rs(180000), targetDate: addMonths(today, 8), location: 'Kerala', status: 'active' as const, ...stamp };
   const g3 = { id: id('goal'), name: 'Land', kind: 'land' as const, ownerId: 'p1' as const, targetAmount: rs(2500000), status: 'active' as const, ...stamp };
   db.goals.push(g1, g2, g3);
-  for (const [g, a, o] of [[g1, 150000, 'hh'], [g2, 45000, 'hh'], [g3, 120000, 'p1']] as const) db.goalAllocations.push({ id: id('alloc'), goalId: g.id, date: addDays(today, -20), amount: rs(a), ownerId: o, ...stamp });
+  // each allocation says which money it is set aside from (plan only — nothing moves)
+  const al = (goalId: string, amount: number, o: 'hh' | 'p1', src: { sourceKind: 'account' | 'investment'; sourceId: string }) => db.goalAllocations.push({ id: id('alloc'), goalId, date: addDays(today, -20), amount: rs(amount), ownerId: o, ...src, ...stamp });
+  al(g1.id, 100000, 'hh', { sourceKind: 'investment', sourceId: inv3.id }); al(g1.id, 50000, 'hh', { sourceKind: 'account', sourceId: sav.id });
+  al(g2.id, 45000, 'hh', { sourceKind: 'investment', sourceId: inv1.id });
+  al(g3.id, 120000, 'p1', { sourceKind: 'investment', sourceId: inv2.id });
 
   const w = (daysAgo: number, item: string, cost: number, category: Database['wasteEntries'][number]['category'], reason: string, ownerId: 'p1' | 'p2' | 'hh' = 'hh') => db.wasteEntries.push({ id: id('waste'), date: addDays(today, -daysAgo), item, cost: rs(cost), category, reason, ownerId, ...stamp });
   w(2, 'Spinach & coriander', 110, 'groceries', 'Spoiled before use'); w(5, 'Leftover biryani', 320, 'food', 'Ordered too much'); w(9, 'Yoga mat', 1400, 'unused', 'Bought, never used', 'p2'); w(34, 'Spinach & coriander', 90, 'groceries', 'Spoiled before use'); w(40, 'Cut fruit box', 260, 'spoiled', 'Forgot in fridge');

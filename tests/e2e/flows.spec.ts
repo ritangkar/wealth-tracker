@@ -129,3 +129,37 @@ test('install guidance on iPhone Safari shows Add to Home Screen steps', async (
   await expect(page.getByText('Add to Home Screen').first()).toBeVisible();
   await ctx.close();
 });
+
+test('goal allocation from several sources: ₹30,000 from an FD + ₹20,000 from a mutual fund (EPF not offered)', async ({ page }) => {
+  await fresh(page);
+  await page.evaluate(async () => {
+    const s = window.__store; const ok = (r: any) => { if (!r.ok) throw new Error(JSON.stringify(r.issues)); return r.value; };
+    ok(await s.addAccount({ name: 'HDFC Savings', kind: 'bank', ownerId: 'p1', openingBalance: 5000000, openingDate: '2026-01-01' }));
+    for (const [name, type, v] of [['SBI FD', 'fd', 20000000], ['Nifty Fund', 'mutual_fund', 15000000], ['EPF', 'ppf_epf', 50000000]] as const) {
+      const i = ok(await s.saveInvestment({ name, type, ownerId: 'p1' }));
+      ok(await s.addValuation({ targetType: 'investment', targetId: i.id, date: '2026-01-01', value: v, invested: v }));
+    }
+    ok(await s.saveGoal({ name: 'Emergency Fund', kind: 'emergency', ownerId: 'hh', targetAmount: 30000000, status: 'active' }));
+  });
+  await page.goto(BASE + '#/plan?tab=goals'); await page.reload(); await page.waitForFunction(() => !!window.__store);
+  await page.getByRole('button', { name: 'Allocate' }).click();
+  const dlg = page.getByRole('dialog');
+  const first = dlg.getByLabel('Set aside from');
+  await expect(first.locator('option', { hasText: 'EPF' })).toHaveCount(0);        // EPF/PPF can't back a goal
+  await first.selectOption({ label: /SBI FD/ as any }).catch(async () => { const v = await first.locator('option', { hasText: 'SBI FD' }).getAttribute('value'); await first.selectOption(v!); });
+  await dlg.getByLabel('Amount', { exact: true }).fill('30000');
+  await dlg.getByRole('button', { name: /Add another source/ }).click();
+  const second = dlg.getByLabel('Source 2');
+  const mfv = await second.locator('option', { hasText: 'Nifty Fund' }).getAttribute('value'); await second.selectOption(mfv!);
+  await dlg.getByLabel('Amount 2').fill('20000');
+  await expect(dlg.getByText('Total set aside: ₹50,000')).toBeVisible();
+  const nwBefore = await page.evaluate(() => 0);
+  void nwBefore;
+  await dlg.getByRole('button', { name: /Set aside/ }).last().click();
+  await expect.poll(() => page.evaluate(() => window.__store.db.goalAllocations.length)).toBe(2);
+  const a = await page.evaluate(() => window.__store.db.goalAllocations.map((x: any) => [x.sourceKind, x.amount]));
+  expect(a).toEqual([['investment', 3000000], ['investment', 2000000]]);
+  await expect(page.getByText(/Set aside from:.*SBI FD ₹30,000.*Nifty Fund ₹20,000/)).toBeVisible();
+  // no money moved: bank balance unchanged, no transactions
+  expect(await page.evaluate(() => window.__store.db.transactions.length)).toBe(0);
+});
