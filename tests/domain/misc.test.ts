@@ -200,3 +200,18 @@ describe('savings', () => {
     expect(compareMonth(db.transactions, '2026-01', (x) => x.spending).vsPrevPct).toBeNull();
   });
 });
+
+describe('projection does not double count manually logged recurring items', () => {
+  it('salary logged by hand is not added again; unlogged one is', () => {
+    const db = db0(); const s = acct(db, { name: 'S', kind: 'bank' });
+    expected(db, { kind: 'salary', name: 'Salary', amount: rs(100000), startDate: '2026-03-01', accountId: s.id, incomeType: 'Salary' });
+    expected(db, { kind: 'subscription', name: 'Netflix', merchant: 'Netflix', amount: rs(649), startDate: '2026-03-05' });
+    txn(db, { type: 'income', amount: rs(100000), date: '2026-03-01', toAccountId: s.id, incomeType: 'Salary' });
+    txn(db, { type: 'expense', amount: rs(649), date: '2026-03-05', fromAccountId: s.id, categoryId: 'cat_subscriptions', merchant: 'Netflix' });
+    let p = projectMonthEnd(db, 'household', '2026-03', '2026-03-10');
+    expect([p.expectedIncomeRemaining, p.expectedFixedRemaining]).toEqual([0, 0]);
+    db.transactions.pop(); // Netflix not yet logged
+    p = projectMonthEnd(db, 'household', '2026-03', '2026-03-10');
+    expect(p.expectedFixedRemaining).toBe(rs(649));
+  });
+});

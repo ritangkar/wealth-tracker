@@ -20,13 +20,26 @@ export function occurrenceDates(item: ExpectedItem, from: ISODate, to: ISODate):
 }
 
 export type OccurrenceState = 'confirmed' | 'skipped' | 'pending';
-export interface Occurrence { item: ExpectedItem; date: ISODate; state: OccurrenceState; overdue: boolean }
+export interface Occurrence { item: ExpectedItem; date: ISODate; state: OccurrenceState; overdue: boolean; /** pending, but a matching manual transaction already exists this month */ likelyRecorded: boolean }
 
 export function occurrenceState(item: ExpectedItem, date: ISODate, txns: Pick<Transaction, 'id'>[]): OccurrenceState {
   const tid = item.confirmed[date];
   if (tid && txns.some((t) => t.id === tid)) return 'confirmed';
   if (item.skipped.includes(date)) return 'skipped';
   return 'pending';
+}
+
+/** Heuristic: the user already logged this by hand (no link) — avoid double counting in projections. */
+export function likelyRecorded(item: ExpectedItem, date: ISODate, txns: Transaction[]): boolean {
+  const month = date.slice(0, 7);
+  const name = (item.merchant ?? item.name).trim().toLowerCase();
+  return txns.some((t) => {
+    if (t.date.slice(0, 7) !== month || t.ownerId !== item.ownerId) return false;
+    if (item.kind === 'salary') return t.type === 'income' && (t.incomeType ?? 'Salary') === (item.incomeType ?? 'Salary');
+    if (item.kind === 'sip') return t.type === 'investment_contribution' && t.investmentId === item.investmentId;
+    const m = (t.merchant ?? '').trim().toLowerCase();
+    return t.type === 'expense' && !!m && (m === name || m.includes(name) || name.includes(m)) && Math.abs(t.amount - item.amount) <= item.amount * 0.15;
+  });
 }
 
 export function expectedOccurrences(db: Database, scope: ViewScope, from: ISODate, to: ISODate, today: ISODate): Occurrence[] {
@@ -36,7 +49,7 @@ export function expectedOccurrences(db: Database, scope: ViewScope, from: ISODat
     if (item.status === 'stopped' && !item.endDate) continue;
     for (const date of occurrenceDates(item, from, to)) {
       const state = occurrenceState(item, date, db.transactions);
-      out.push({ item, date, state, overdue: state === 'pending' && date < today });
+      out.push({ item, date, state, overdue: state === 'pending' && date < today, likelyRecorded: state === 'pending' && likelyRecorded(item, date, db.transactions) });
     }
   }
   return out.sort((a, b) => a.date.localeCompare(b.date));
@@ -63,7 +76,7 @@ export interface Commitment { kind: CommitmentKind; refId: Id; name: string; dat
 export function upcomingCommitments(db: Database, scope: ViewScope, from: ISODate, to: ISODate, today: ISODate): Commitment[] {
   const out: Commitment[] = [];
   for (const o of expectedOccurrences(db, scope, from, to, today)) {
-    if (o.state !== 'pending' || o.item.kind === 'salary') continue;
+    if (o.state !== 'pending' || o.likelyRecorded || o.item.kind === 'salary') continue;
     out.push({ kind: 'expected', refId: o.item.id, name: o.item.name, date: o.date, amount: o.item.amount, overdue: o.overdue });
   }
   for (const e of db.emis) {

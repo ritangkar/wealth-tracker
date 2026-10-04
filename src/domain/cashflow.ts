@@ -91,7 +91,7 @@ export function projectMonthEnd(db: Database, scope: ViewScope, month: MonthKey,
   const remainingDays = dim - elapsed;
 
   // pending expected occurrences within this month (including overdue-but-unconfirmed)
-  const occ = expectedOccurrences(db, scope, `${month}-01`, `${month}-31`, today).filter((o) => o.state === 'pending');
+  const occ = expectedOccurrences(db, scope, `${month}-01`, `${month}-31`, today).filter((o) => o.state === 'pending' && !o.likelyRecorded);
   const expectedIncome = occ.filter((o) => isIncomeKind(o.item.kind)).reduce((s, o) => s + o.item.amount, 0);
   const expectedFixed = occ.filter((o) => isSpendingKind(o.item.kind)).reduce((s, o) => s + o.item.amount, 0);
 
