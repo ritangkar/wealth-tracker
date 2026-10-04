@@ -123,7 +123,7 @@ export function validateTransaction(t: Transaction, db: Database, existing?: Tra
     case 'liability_creation':
       if (!t.liabilityId || !db.liabilities.some((l) => l.id === t.liabilityId)) bad('liabilityId', 'Choose a liability');
       if (t.toAccountId && !acct(t.toAccountId)) bad('toAccountId', 'Account not found'); break;
-    case 'liability_payment': needFrom();
+    case 'liability_payment': needFrom(); noCard(t.fromAccountId, 'fromAccountId');
       if (!t.liabilityId || !db.liabilities.some((l) => l.id === t.liabilityId)) bad('liabilityId', 'Choose a liability');
       if (t.principalPortion !== undefined && (!Number.isInteger(t.principalPortion) || t.principalPortion < 0 || t.principalPortion > t.amount))
         bad('principalPortion', 'Principal must be between 0 and the payment amount');

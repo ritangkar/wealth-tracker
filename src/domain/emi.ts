@@ -36,6 +36,7 @@ export interface NewEmiInput {
   monthsCompleted?: number;
   /** Existing EMI: principal remaining if known; otherwise estimated pro-rata (labelled estimate). */
   outstanding?: Paise;
+  blockedOverride?: Paise;
   now: string; id: Id;
 }
 export function buildEmi(i: NewEmiInput): { emi: Emi; outstandingEstimated: boolean } {
@@ -49,7 +50,7 @@ export function buildEmi(i: NewEmiInput): { emi: Emi; outstandingEstimated: bool
       id: i.id, createdAt: i.now, updatedAt: i.now, name: i.name, cardAccountId: i.cardAccountId, ownerId: i.ownerId,
       originalAmount: i.originalAmount, emiAmount: i.emiAmount, tenure: i.tenure, startDate: i.startDate, paymentDay: i.paymentDay,
       monthsCompletedAtEntry: done, outstandingAtEntry: remaining === 0 ? 0 : outstanding, payments: [],
-      blockPolicy: i.blockPolicy ?? 'as_paid', purchaseTxnId: i.purchaseTxnId, status: remaining === 0 ? 'completed' : 'active', notes: i.notes,
+      blockPolicy: i.blockPolicy ?? 'as_paid', blockedOverride: i.blockedOverride, purchaseTxnId: i.purchaseTxnId, status: remaining === 0 ? 'completed' : 'active', notes: i.notes,
     },
   };
 }

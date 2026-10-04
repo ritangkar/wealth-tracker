@@ -41,7 +41,8 @@ async function networkFirstNavigation(request) {
   try {
     const ctrl = new AbortController();
     const t = setTimeout(() => ctrl.abort(), 4000);
-    const res = await fetch(request, { signal: ctrl.signal });
+    // no-cache = always revalidate with the server, so Pages' max-age never serves a stale shell after a deploy
+    const res = await fetch(request.url, { cache: 'no-cache', signal: ctrl.signal });
     clearTimeout(t);
     if (res.ok) { cache.put('./index.html', res.clone()); return res; }
   } catch (_) { /* offline or slow: fall through */ }

@@ -22,8 +22,9 @@ export async function registerSW(): Promise<void> {
     if (reg.waiting && navigator.serviceWorker.controller) set({ waiting: reg.waiting });
     track(reg.installing);
     reg.addEventListener('updatefound', () => track(reg!.installing));
-    let reloading = false;
-    navigator.serviceWorker.addEventListener('controllerchange', () => { if (reloading) return; reloading = true; location.reload(); });
+    // reload only when an UPDATE replaces an existing controller (not on first install's clients.claim())
+    let reloading = false; const hadController = !!navigator.serviceWorker.controller;
+    navigator.serviceWorker.addEventListener('controllerchange', () => { if (reloading || !hadController) return; reloading = true; location.reload(); });
     // check for a new deploy when the app returns to the foreground and hourly
     document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') void reg?.update().catch(() => {}); });
     setInterval(() => void reg?.update().catch(() => {}), 60 * 60 * 1000);
