@@ -1,0 +1,24 @@
+import { render } from 'preact';
+import './ui/styles.css';
+import { Store } from './data/store';
+import { IdbStorage } from './data/idb';
+import { App } from './ui/App';
+import { registerSW } from './pwa/register';
+
+async function boot() {
+  const root = document.getElementById('app')!;
+  try {
+    const storage = new IdbStorage();
+    const store = await Store.open(storage, { appVersion: __APP_VERSION__ });
+    void storage.persist();
+    render(<App store={store} />, root);
+    void registerSW();
+    (window as unknown as { __store?: Store }).__store = store; // handy for debugging / e2e; contains no secrets beyond what's on screen
+  } catch (e) {
+    root.innerHTML = '';
+    const p = document.createElement('p'); p.style.cssText = 'font-family:system-ui;padding:2rem;max-width:36rem;margin:auto';
+    p.textContent = `Wealth OS could not open its local database (${(e as Error).message}). Private browsing or blocked site data can cause this. Nothing was changed.`;
+    root.appendChild(p);
+  }
+}
+void boot();

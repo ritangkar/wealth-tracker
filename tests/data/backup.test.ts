@@ -147,3 +147,15 @@ describe('safe restore via Store', () => {
     const store = await Store.open(st); expect(store.status).toBe('recovery'); expect((await st.load())!.schemaVersion).toBe(SCHEMA_VERSION + 1);
   });
 });
+
+describe('sample data', () => {
+  it('is valid, balances sensibly, and round-trips through backup', async () => {
+    const { sampleDatabase } = await import('../../src/data/sample');
+    const { computeNetWorth } = await import('../../src/domain/networth');
+    const db = sampleDatabase('2026-10-04');
+    const r = await parseBackup(serializeBackup(await createBackup(db, 't')));
+    expect(r.ok, r.errors.join('\n')).toBe(true);
+    const nw = computeNetWorth(db, 'household');
+    expect(nw.assets.total).toBeGreaterThan(0); expect(nw.net).toBeGreaterThan(0);
+  });
+});
